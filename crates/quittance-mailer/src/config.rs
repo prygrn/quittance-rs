@@ -1,0 +1,229 @@
+use std::collections::HashMap;
+use std::fmt;
+
+use crate::MailError;
+
+/// Noms des variables de configuration SMTP.
+pub(crate) mod variable_names {
+    pub const HOST: &str = "SMTP_HOST";
+    pub const PORT: &str = "SMTP_PORT";
+    pub const USERNAME: &str = "SMTP_USERNAME";
+    pub const PASSWORD: &str = "SMTP_PASSWORD";
+    pub const SECURITY: &str = "SMTP_SECURITY";
+}
+
+/// Chiffrement de la connexion SMTP.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SmtpSecurity {
+    /// `starttls` : connexion en clair puis passage en TLS, mode par défaut.
+    StartTls,
+    /// `tls` : TLS dès la connexion.
+    ImplicitTls,
+    /// `none` : réservé au SMTP local de test (Mailpit), sans authentification.
+    Unencrypted,
+}
+
+/// Configuration SMTP validée au chargement.
+#[derive(Clone, PartialEq, Eq)]
+pub struct SmtpConfig {
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) username: String,
+    pub(crate) password: String,
+    pub(crate) security: SmtpSecurity,
+}
+
+impl SmtpConfig {
+    /// Lit la configuration depuis une table de variables (par exemple l'environnement
+    /// chargé depuis `.env`), sans accéder elle-même à l'environnement du processus.
+    pub fn from_variables(variables: &HashMap<String, String>) -> Result<Self, MailError> {
+        todo!()
+    }
+}
+
+/// Le mot de passe n'apparaît jamais dans les traces.
+impl fmt::Debug for SmtpConfig {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PASSWORD: &str = "s3cr3t-value";
+
+    fn complete_variables() -> HashMap<String, String> {
+        HashMap::from([
+            (
+                variable_names::HOST.to_owned(),
+                "smtp.example.fr".to_owned(),
+            ),
+            (variable_names::PORT.to_owned(), "587".to_owned()),
+            (
+                variable_names::USERNAME.to_owned(),
+                "paul.durand@example.fr".to_owned(),
+            ),
+            (variable_names::PASSWORD.to_owned(), PASSWORD.to_owned()),
+        ])
+    }
+
+    fn variables_with(name: &str, value: &str) -> HashMap<String, String> {
+        let mut variables = complete_variables();
+        variables.insert(name.to_owned(), value.to_owned());
+        variables
+    }
+
+    fn variables_without(name: &str) -> HashMap<String, String> {
+        let mut variables = complete_variables();
+        variables.remove(name);
+        variables
+    }
+
+    #[test]
+    fn given_complete_variables_when_loading_config_then_it_carries_every_value() {
+        let variables = complete_variables();
+
+        let config = SmtpConfig::from_variables(&variables).unwrap();
+
+        assert_eq!(config.host, "smtp.example.fr");
+        assert_eq!(config.port, 587);
+        assert_eq!(config.username, "paul.durand@example.fr");
+        assert_eq!(config.password, PASSWORD);
+    }
+
+    #[test]
+    fn given_no_security_variable_when_loading_config_then_starttls_is_used() {
+        let variables = complete_variables();
+
+        let config = SmtpConfig::from_variables(&variables).unwrap();
+
+        assert_eq!(config.security, SmtpSecurity::StartTls);
+    }
+
+    #[test]
+    fn given_blank_security_variable_when_loading_config_then_starttls_is_used() {
+        let variables = variables_with(variable_names::SECURITY, "  ");
+
+        let config = SmtpConfig::from_variables(&variables).unwrap();
+
+        assert_eq!(config.security, SmtpSecurity::StartTls);
+    }
+
+    #[test]
+    fn given_each_known_security_mode_when_loading_config_then_it_is_selected() {
+        let security_modes = [
+            ("starttls", SmtpSecurity::StartTls),
+            ("tls", SmtpSecurity::ImplicitTls),
+            ("none", SmtpSecurity::Unencrypted),
+        ];
+
+        for (value, expected_security) in security_modes {
+            let variables = variables_with(variable_names::SECURITY, value);
+
+            let config = SmtpConfig::from_variables(&variables).unwrap();
+
+            assert_eq!(config.security, expected_security, "for `{value}`");
+        }
+    }
+
+    #[test]
+    fn given_values_surrounded_by_spaces_when_loading_config_then_they_are_trimmed() {
+        let mut variables = variables_with(variable_names::HOST, " smtp.example.fr\t");
+        variables.insert(variable_names::PORT.to_owned(), " 465 ".to_owned());
+        variables.insert(variable_names::SECURITY.to_owned(), " tls\n".to_owned());
+
+        let config = SmtpConfig::from_variables(&variables).unwrap();
+
+        assert_eq!(config.host, "smtp.example.fr");
+        assert_eq!(config.port, 465);
+        assert_eq!(config.security, SmtpSecurity::ImplicitTls);
+    }
+
+    #[test]
+    fn given_each_required_variable_absent_when_loading_config_then_it_is_missing() {
+        let required_variables = [
+            variable_names::HOST,
+            variable_names::PORT,
+            variable_names::USERNAME,
+            variable_names::PASSWORD,
+        ];
+
+        for required_variable in required_variables {
+            let variables = variables_without(required_variable);
+
+            let result = SmtpConfig::from_variables(&variables);
+
+            assert!(
+                matches!(result, Err(MailError::MissingVariable(name)) if name == required_variable),
+                "{required_variable} should be missing, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn given_blank_required_variable_when_loading_config_then_it_is_missing() {
+        let variables = variables_with(variable_names::HOST, "   ");
+
+        let result = SmtpConfig::from_variables(&variables);
+
+        assert!(matches!(
+            result,
+            Err(MailError::MissingVariable(variable_names::HOST))
+        ));
+    }
+
+    #[test]
+    fn given_invalid_ports_when_loading_config_then_each_is_rejected() {
+        let invalid_ports = ["smtp", "-1", "0", "65536", "58 7", "587.0"];
+
+        for invalid_port in invalid_ports {
+            let variables = variables_with(variable_names::PORT, invalid_port);
+
+            let result = SmtpConfig::from_variables(&variables);
+
+            assert!(
+                matches!(result, Err(MailError::InvalidPort(_))),
+                "{invalid_port} should be rejected, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn given_boundary_ports_when_loading_config_then_each_is_accepted() {
+        for boundary_port in ["1", "65535"] {
+            let variables = variables_with(variable_names::PORT, boundary_port);
+
+            let result = SmtpConfig::from_variables(&variables);
+
+            assert!(result.is_ok(), "{boundary_port} should be accepted");
+        }
+    }
+
+    #[test]
+    fn given_unknown_security_modes_when_loading_config_then_each_is_rejected() {
+        let unknown_security_modes = ["ssl", "STARTTLS", "plain", "starttls tls"];
+
+        for unknown_security_mode in unknown_security_modes {
+            let variables = variables_with(variable_names::SECURITY, unknown_security_mode);
+
+            let result = SmtpConfig::from_variables(&variables);
+
+            assert!(
+                matches!(result, Err(MailError::UnknownSecurityMode(_))),
+                "{unknown_security_mode} should be rejected, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn given_loaded_config_when_debug_formatting_then_password_is_hidden() {
+        let config = SmtpConfig::from_variables(&complete_variables()).unwrap();
+
+        let debug_output = format!("{config:?}");
+
+        assert!(!debug_output.contains(PASSWORD));
+        assert!(debug_output.contains("smtp.example.fr"));
+    }
+}

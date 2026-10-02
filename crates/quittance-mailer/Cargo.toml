@@ -1,0 +1,26 @@
+[package]
+name = "quittance-mailer"
+version = "0.1.0"
+description = "Construction et envoi par SMTP de l'email de quittance"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+lettre = { version = "0.11.23", default-features = false, features = [
+    "builder",
+    "hostname",
+    "smtp-transport",
+    "rustls",
+    "ring",
+    "webpki-roots",
+] }
+quittance-core = { path = "../quittance-core" }
+thiserror = "2.0.21"
+
+[dev-dependencies]
+time = { version = "0.3.55", features = ["macros"] }
