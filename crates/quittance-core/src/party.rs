@@ -203,6 +203,13 @@ mod tests {
     }
 
     #[test]
+    fn given_emails_with_accented_characters_when_creating_party_then_each_is_rejected() {
+        let emails_with_accented_characters = ["jeanné@exemple.fr", "jeanne@exémple.fr"];
+
+        assert_each_email_is_rejected(&emails_with_accented_characters);
+    }
+
+    #[test]
     fn given_well_formed_emails_when_creating_party_then_each_is_accepted() {
         let well_formed_emails = [
             "a@b.co",
