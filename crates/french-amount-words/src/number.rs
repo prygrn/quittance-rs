@@ -1,4 +1,52 @@
-use crate::AmountWordsError;
+use crate::{AmountWordsError, MAX_VALUE};
+
+pub(crate) const MILLION: u64 = 1_000_000;
+
+const MILLIARD: u64 = 1_000_000_000;
+const THOUSAND: u64 = 1_000;
+const HUNDRED: u64 = 100;
+const SMALLEST_PLURAL_QUANTITY: u64 = 2;
+
+const ZERO_WORD: &str = "zéro";
+const HUNDRED_WORD: &str = "cent";
+const THOUSAND_WORD: &str = "mille";
+const PLURAL_MARK: &str = "s";
+const WORD_SEPARATOR: &str = " ";
+
+/// Mots de 0 à 19, indexés par leur valeur ; zéro n'apparaît jamais dans un nombre composé.
+const BELOW_TWENTY_WORDS: [&str; 20] = [
+    "", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix", "onze",
+    "douze", "treize", "quatorze", "quinze", "seize", "dix-sept", "dix-huit", "dix-neuf",
+];
+
+/// Restes joints par « et » après une dizaine : vingt et un, soixante et onze.
+const REMAINDERS_JOINED_WITH_ET: [u64; 2] = [1, 11];
+
+/// « quatre-vingt » multiplie « vingt » : il prend le pluriel et refuse « et ».
+const MULTIPLIED_VINGT: u64 = 80;
+
+/// Dizaines de base par valeur croissante ; 70 et 90 se forment sur soixante et
+/// quatre-vingt suivis de 10 à 19, d'où l'absence de bases à 70 et 90.
+const TENS: [(u64, &str); 6] = [
+    (20, "vingt"),
+    (30, "trente"),
+    (40, "quarante"),
+    (50, "cinquante"),
+    (60, "soixante"),
+    (MULTIPLIED_VINGT, "quatre-vingt"),
+];
+
+/// Noms d'échelle : contrairement à « mille », ils s'accordent et laissent vingt et cent
+/// s'accorder devant eux.
+const SCALE_NOUNS: [(u64, &str); 2] = [(MILLIARD, "milliard"), (MILLION, "million")];
+
+/// Accord de « vingt » et « cent » quand ils terminent un groupe de trois chiffres.
+#[derive(Clone, Copy)]
+enum Agreement {
+    Plural,
+    /// Devant « mille », adjectif numéral : quatre-vingt mille, deux cent mille.
+    Invariable,
+}
 
 /// Écrit un nombre entier en toutes lettres, en graphie traditionnelle.
 ///
@@ -6,7 +54,99 @@ use crate::AmountWordsError;
 ///
 /// Renvoie [`AmountWordsError::ValueTooLarge`] si `value` dépasse [`crate::MAX_VALUE`].
 pub fn number_to_words(value: u64) -> Result<String, AmountWordsError> {
-    todo!()
+    if value > MAX_VALUE {
+        return Err(AmountWordsError::ValueTooLarge { value });
+    }
+    if value == 0 {
+        return Ok(ZERO_WORD.to_owned());
+    }
+
+    let mut parts: Vec<String> = Vec::new();
+    for (scale, noun) in SCALE_NOUNS {
+        let count = value / scale % THOUSAND;
+        if count > 0 {
+            parts.push(format!(
+                "{} {noun}{}",
+                group_words(count, Agreement::Plural),
+                plural_mark(count >= SMALLEST_PLURAL_QUANTITY)
+            ));
+        }
+    }
+
+    let thousands = value / THOUSAND % THOUSAND;
+    match thousands {
+        0 => {}
+        1 => parts.push(THOUSAND_WORD.to_owned()),
+        _ => parts.push(format!(
+            "{} {THOUSAND_WORD}",
+            group_words(thousands, Agreement::Invariable)
+        )),
+    }
+
+    let units = value % THOUSAND;
+    if units > 0 {
+        parts.push(group_words(units, Agreement::Plural));
+    }
+
+    Ok(parts.join(WORD_SEPARATOR))
+}
+
+/// Écrit un groupe de 1 à 999.
+fn group_words(value: u64, agreement: Agreement) -> String {
+    let hundreds = value / HUNDRED;
+    let below_hundred = value % HUNDRED;
+
+    let mut parts: Vec<String> = Vec::new();
+    match hundreds {
+        0 => {}
+        1 => parts.push(HUNDRED_WORD.to_owned()),
+        _ => {
+            let is_plural = below_hundred == 0 && matches!(agreement, Agreement::Plural);
+            parts.push(format!(
+                "{} {HUNDRED_WORD}{}",
+                below_twenty_word(hundreds),
+                plural_mark(is_plural)
+            ));
+        }
+    }
+    if below_hundred > 0 {
+        parts.push(below_hundred_words(below_hundred, agreement));
+    }
+
+    parts.join(WORD_SEPARATOR)
+}
+
+/// Écrit un nombre de 1 à 99, en liant dizaines et unités par un trait d'union ou par « et ».
+fn below_hundred_words(value: u64, agreement: Agreement) -> String {
+    let Some(&(tens_value, tens_word)) = TENS
+        .iter()
+        .rev()
+        .find(|(tens_value, _)| *tens_value <= value)
+    else {
+        return below_twenty_word(value).to_owned();
+    };
+
+    let is_multiplied_vingt = tens_value == MULTIPLIED_VINGT;
+    let remainder = value - tens_value;
+    if remainder == 0 {
+        let is_plural = is_multiplied_vingt && matches!(agreement, Agreement::Plural);
+        return format!("{tens_word}{}", plural_mark(is_plural));
+    }
+
+    let remainder_word = below_twenty_word(remainder);
+    if !is_multiplied_vingt && REMAINDERS_JOINED_WITH_ET.contains(&remainder) {
+        format!("{tens_word} et {remainder_word}")
+    } else {
+        format!("{tens_word}-{remainder_word}")
+    }
+}
+
+fn plural_mark(is_plural: bool) -> &'static str {
+    if is_plural { PLURAL_MARK } else { "" }
+}
+
+fn below_twenty_word(value: u64) -> &'static str {
+    BELOW_TWENTY_WORDS[value as usize]
 }
 
 #[cfg(test)]

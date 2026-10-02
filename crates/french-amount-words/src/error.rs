@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::MAX_VALUE;
+
 /// Échec de conversion d'un nombre ou d'un montant en lettres.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AmountWordsError {
@@ -9,7 +11,12 @@ pub enum AmountWordsError {
 
 impl fmt::Display for AmountWordsError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        match self {
+            Self::ValueTooLarge { value } => write!(
+                formatter,
+                "value {value} exceeds the maximum convertible value {MAX_VALUE}"
+            ),
+        }
     }
 }
 

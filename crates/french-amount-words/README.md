@@ -63,4 +63,4 @@ des rectifications orthographiques de 1990 (qui lient tous les éléments par de
 
 ## Licence
 
-MIT, voir [LICENSE](LICENSE).
+MIT, voir le fichier `LICENSE`.

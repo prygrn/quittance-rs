@@ -1,5 +1,3 @@
-// Temporaire : retiré à l'implémentation, les stubs n'utilisent pas encore leurs paramètres.
-#![allow(unused_variables, dead_code)]
 #![doc = include_str!("../README.md")]
 
 mod error;
