@@ -5,9 +5,6 @@
 //! ([`SignatureImage::protect_for_receipt`]) : mention de la quittance incrustée en travers,
 //! résolution réduite, fond blanc opaque. L'image d'origine ne quitte jamais ce crate.
 
-// Temporaire : l'API est en stubs `todo!()` tant que l'implémentation n'est pas écrite.
-#![allow(unused_variables, dead_code)]
-
 mod error;
 mod loading;
 mod mention;
