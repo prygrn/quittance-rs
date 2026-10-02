@@ -1,0 +1,3 @@
+[submodule "vendor/agent-kernel"]
+	path = vendor/agent-kernel
+	url = https://github.com/prygrn/agent-kernel.git
