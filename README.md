@@ -14,7 +14,7 @@ Générateur de quittances de loyer, pour usage personnel (bailleur particulier)
 
 - [Tauri](https://tauri.app/) — IHM desktop locale (pas d'hébergement, lancement en localhost uniquement)
 - Rust (backend Tauri)
-- [agent-kernel](https://github.com/prygrn/agent-kernel) — submodule, en `vendor/agent-kernel`
+- [agent-kernel](https://github.com/prygrn/agent-kernel) — submodule, en `.agents`
 
 ## Statut
 
