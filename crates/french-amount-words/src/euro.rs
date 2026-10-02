@@ -42,7 +42,7 @@ pub fn euro_amount_to_words(cents: u64) -> Result<String, AmountWordsError> {
 fn euro_unit(euros: u64) -> &'static str {
     if euros <= LARGEST_SINGULAR_QUANTITY {
         EURO_SINGULAR
-    } else if euros % MILLION == 0 {
+    } else if euros.is_multiple_of(MILLION) {
         EURO_AFTER_SCALE_NOUN
     } else {
         EURO_PLURAL
