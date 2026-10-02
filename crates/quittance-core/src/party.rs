@@ -46,20 +46,54 @@ impl Party {
     }
 }
 
-/// Vérification de forme volontairement simple : la preuve d'existence
-/// de l'adresse viendra de la réception du mail, pas d'une regex.
+/// Syntaxe d'adresse retenue, sous-ensemble de la RFC 5322 sans forme entre guillemets.
+mod email_syntax {
+    pub const ADDRESS_SEPARATOR: char = '@';
+    pub const DOT: char = '.';
+    pub const HYPHEN: char = '-';
+    /// Production `atext` de la RFC 5322 (section 3.2.3), hors lettres et chiffres ASCII.
+    pub const LOCAL_PART_SPECIAL_CHARACTERS: &str = "!#$%&'*+/=?^_`{|}~-";
+    pub const MINIMUM_DOMAIN_LABEL_COUNT: usize = 2;
+}
+
+/// Vérification de forme volontairement légère, sans dépendance : la preuve
+/// d'existence de l'adresse viendra de la réception du mail.
+/// Partie locale : caractères `atext` séparés par des points simples (`dot-atom-text`).
+/// Domaine : au moins deux labels non vides de lettres, chiffres ASCII et tirets,
+/// sans tiret en début ni en fin de label.
 fn is_well_formed_email(email: &str) -> bool {
-    if email.chars().any(char::is_whitespace) {
-        return false;
-    }
-    let Some((local_part, domain)) = email.split_once('@') else {
+    let Some((local_part, domain)) = email.split_once(email_syntax::ADDRESS_SEPARATOR) else {
         return false;
     };
-    !local_part.is_empty()
-        && !domain.contains('@')
-        && domain.contains('.')
-        && !domain.starts_with('.')
-        && !domain.ends_with('.')
+    is_well_formed_local_part(local_part) && is_well_formed_domain(domain)
+}
+
+fn is_well_formed_local_part(local_part: &str) -> bool {
+    local_part
+        .split(email_syntax::DOT)
+        .all(|atom| !atom.is_empty() && atom.chars().all(is_atext_character))
+}
+
+fn is_atext_character(character: char) -> bool {
+    character.is_ascii_alphanumeric()
+        || email_syntax::LOCAL_PART_SPECIAL_CHARACTERS.contains(character)
+}
+
+fn is_well_formed_domain(domain: &str) -> bool {
+    let labels: Vec<&str> = domain.split(email_syntax::DOT).collect();
+    labels.len() >= email_syntax::MINIMUM_DOMAIN_LABEL_COUNT
+        && labels
+            .iter()
+            .all(|label| is_well_formed_domain_label(label))
+}
+
+fn is_well_formed_domain_label(label: &str) -> bool {
+    !label.is_empty()
+        && !label.starts_with(email_syntax::HYPHEN)
+        && !label.ends_with(email_syntax::HYPHEN)
+        && label
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == email_syntax::HYPHEN)
 }
 
 #[cfg(test)]
