@@ -12,18 +12,18 @@ Générateur de quittances de loyer, pour usage personnel (bailleur particulier)
 
 ## Signature protégée contre la copie
 
-Une quittance porte ta signature et part chez un tiers. Dans un PDF classique, l'image de signature y est incorporée telle quelle : n'importe qui peut l'extraire en un clic, en pleine résolution et avec sa transparence, puis la coller sur un autre document.
+Une quittance porte la signature du bailleur et part chez un tiers. Dans un PDF classique, l'image de signature y est incorporée telle quelle : n'importe qui peut l'extraire en un clic, en pleine résolution et avec sa transparence, puis la coller sur un autre document.
 
-quittance-rs ne met jamais l'image d'origine dans le PDF. Avant chaque envoi, la signature est :
+La signature est un fichier image dont le chemin est fixé dans `.env` ; l'écran ne propose pas d'import. quittance-rs ne met jamais l'image d'origine dans le PDF. Avant chaque envoi, la signature est :
 
-- **fusionnée avec une mention propre à la quittance** (période, locataire), écrite en travers de la signature et aplatie dans la même image : une signature extraite reste liée à cette quittance, toute réutilisation se voit ;
-- **dégradée pour la copie** : résolution limitée au strict nécessaire pour l'impression, fond blanc à la place de la transparence. Elle se colle mal sur un autre document.
+- **fusionnée avec une mention propre à la quittance** (période, locataire), écrite en travers de la signature et aplatie dans la même image : une signature extraite reste liée à cette quittance, ce qui rend une réutilisation facile à repérer ;
+- **dégradée pour la copie** : résolution limitée au strict nécessaire pour l'impression, fond blanc à la place de la transparence. Elle s'intègre moins bien à un autre document.
 
 Une capture d'écran reste possible ; elle ne donne qu'une image marquée et de qualité réduite.
 
 ## Évolutions prévues
 
-- **Signature électronique certifiée (PAdES)** : seule vraie preuve d'authenticité. Un certificat scelle le PDF et toute modification devient détectable. Elle remplacera à terme la signature image.
+- **Signature électronique certifiée (PAdES)** : preuve d'intégrité et d'origine vérifiable. Un certificat scelle le PDF et toute modification devient détectable. Elle remplacera à terme la signature image.
 
 ## Stack
 
@@ -50,7 +50,7 @@ La documentation du comportement, ce sont les tests : chaque crate et chaque mod
 
 ## Configuration
 
-Copier `.env.example` en `.env` et le compléter : identité du bailleur, image de signature, chemin de Chromium, serveur SMTP. Le bailleur reçoit chaque quittance en copie cachée, qui sert d'archive.
+Copier `.env.example` en `.env` et le compléter : identité du bailleur, chemin de l'image de signature, chemin de Chromium, serveur SMTP. Le bailleur reçoit chaque quittance en copie cachée, qui sert d'archive.
 
 ## Développement
 
