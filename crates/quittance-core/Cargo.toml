@@ -1,0 +1,11 @@
+[package]
+name = "quittance-core"
+version = "0.1.0"
+description = "Domaine et validation des quittances de loyer"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
