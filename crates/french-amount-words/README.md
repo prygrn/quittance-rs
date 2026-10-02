@@ -33,7 +33,8 @@ fn main() -> Result<(), AmountWordsError> {
 La constante `MAX_VALUE` vaut `999_999_999_999` (neuf cent quatre-vingt-dix-neuf milliards…).
 
 - `number_to_words` renvoie `AmountWordsError::ValueTooLarge` au-delà de `MAX_VALUE`.
-- `euro_amount_to_words` renvoie la même erreur quand la partie en euros dépasse `MAX_VALUE`.
+- `euro_amount_to_words` renvoie la même erreur quand la partie en euros dépasse `MAX_VALUE` ;
+  le champ `value` de l'erreur contient alors la partie en euros, et non l'entrée en centimes.
 
 ## Règles d'orthographe appliquées
 

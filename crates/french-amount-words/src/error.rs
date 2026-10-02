@@ -6,7 +6,12 @@ use crate::MAX_VALUE;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AmountWordsError {
     /// La valeur dépasse [`crate::MAX_VALUE`].
-    ValueTooLarge { value: u64 },
+    ValueTooLarge {
+        /// Valeur comparée à [`crate::MAX_VALUE`] : l'entrée de [`crate::number_to_words`],
+        /// mais la partie en euros (et non l'entrée en centimes) pour
+        /// [`crate::euro_amount_to_words`].
+        value: u64,
+    },
 }
 
 impl fmt::Display for AmountWordsError {

@@ -17,7 +17,8 @@ const CENTIME_PLURAL: &str = "centimes";
 /// # Errors
 ///
 /// Renvoie [`AmountWordsError::ValueTooLarge`] si la partie en euros dépasse
-/// [`crate::MAX_VALUE`].
+/// [`crate::MAX_VALUE`] ; le champ `value` de l'erreur contient alors cette partie en
+/// euros, et non `cents`.
 pub fn euro_amount_to_words(cents: u64) -> Result<String, AmountWordsError> {
     let euros = cents / CENTS_PER_EURO;
     let remaining_cents = cents % CENTS_PER_EURO;
