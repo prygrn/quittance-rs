@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::num::NonZeroU16;
 
 use crate::MailError;
 
@@ -37,14 +38,64 @@ impl SmtpConfig {
     /// Lit la configuration depuis une table de variables (par exemple l'environnement
     /// chargé depuis `.env`), sans accéder elle-même à l'environnement du processus.
     pub fn from_variables(variables: &HashMap<String, String>) -> Result<Self, MailError> {
-        todo!()
+        let host = required_value(variables, variable_names::HOST)?;
+        let port = parse_port(required_value(variables, variable_names::PORT)?)?;
+        let username = required_value(variables, variable_names::USERNAME)?;
+        let password = required_value(variables, variable_names::PASSWORD)?;
+        let security = parse_security(optional_value(variables, variable_names::SECURITY))?;
+        Ok(Self {
+            host: host.to_owned(),
+            port,
+            username: username.to_owned(),
+            password: password.to_owned(),
+            security,
+        })
+    }
+}
+
+/// Valeur trimée, absente si la variable est vide.
+fn optional_value<'map>(variables: &'map HashMap<String, String>, name: &str) -> Option<&'map str> {
+    variables
+        .get(name)
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+}
+
+fn required_value<'map>(
+    variables: &'map HashMap<String, String>,
+    name: &'static str,
+) -> Result<&'map str, MailError> {
+    optional_value(variables, name).ok_or(MailError::MissingVariable(name))
+}
+
+/// Le port 0 n'est pas joignable : `NonZeroU16` l'écarte avec les valeurs hors bornes.
+fn parse_port(value: &str) -> Result<u16, MailError> {
+    value
+        .parse::<NonZeroU16>()
+        .map(NonZeroU16::get)
+        .map_err(|_| MailError::InvalidPort(value.to_owned()))
+}
+
+fn parse_security(value: Option<&str>) -> Result<SmtpSecurity, MailError> {
+    match value {
+        None | Some("starttls") => Ok(SmtpSecurity::StartTls),
+        Some("tls") => Ok(SmtpSecurity::ImplicitTls),
+        Some("none") => Ok(SmtpSecurity::Unencrypted),
+        Some(unknown) => Err(MailError::UnknownSecurityMode(unknown.to_owned())),
     }
 }
 
 /// Le mot de passe n'apparaît jamais dans les traces.
 impl fmt::Debug for SmtpConfig {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        formatter
+            .debug_struct("SmtpConfig")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("username", &self.username)
+            .field("password", &"<redacted>")
+            .field("security", &self.security)
+            .finish()
     }
 }
 

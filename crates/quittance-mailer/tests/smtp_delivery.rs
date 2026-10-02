@@ -157,4 +157,5 @@ fn given_receipt_email_when_sending_through_smtp_then_pdf_is_attached() {
         "quittance-2026-10.pdf"
     );
     assert_eq!(string_field(attachments, "ContentType"), "application/pdf");
+    assert!(attachments.contains(&format!("\"Size\":{}", PDF_CONTENT.len())));
 }

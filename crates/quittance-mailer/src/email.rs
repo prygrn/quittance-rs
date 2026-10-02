@@ -1,6 +1,28 @@
-use quittance_core::Receipt;
+use quittance_core::{Date, Party, Receipt};
 
 use crate::MailError;
+
+/// Libellés fixes de l'email, en français comme la quittance.
+mod wording {
+    pub const SUBJECT_PREFIX: &str = "Quittance de loyer –";
+    pub const FILE_NAME_PREFIX: &str = "quittance";
+    pub const PDF_CONTENT_TYPE: &str = "application/pdf";
+    /// Indexé par numéro de mois moins un.
+    pub const FRENCH_MONTH_NAMES: [&str; 12] = [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre",
+    ];
+}
 
 /// Nom et adresse d'un correspondant de l'email.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,12 +32,19 @@ pub struct EmailContact {
 }
 
 impl EmailContact {
+    fn from_party(party: &Party) -> Self {
+        Self {
+            name: party.name().to_owned(),
+            email: party.email().to_owned(),
+        }
+    }
+
     pub fn name(&self) -> &str {
-        todo!()
+        &self.name
     }
 
     pub fn email(&self) -> &str {
-        todo!()
+        &self.email
     }
 }
 
@@ -28,15 +57,15 @@ pub struct PdfAttachment {
 
 impl PdfAttachment {
     pub fn file_name(&self) -> &str {
-        todo!()
+        &self.file_name
     }
 
     pub fn content_type(&self) -> &str {
-        todo!()
+        wording::PDF_CONTENT_TYPE
     }
 
     pub fn content(&self) -> &[u8] {
-        todo!()
+        &self.content
     }
 }
 
@@ -53,34 +82,75 @@ pub struct ReceiptEmail {
 
 impl ReceiptEmail {
     pub fn sender(&self) -> &EmailContact {
-        todo!()
+        &self.sender
     }
 
     pub fn recipient(&self) -> &EmailContact {
-        todo!()
+        &self.recipient
     }
 
     /// Adresse en copie cachée : celle du bailleur, dont la copie sert d'archive.
     pub fn blind_copy(&self) -> &str {
-        todo!()
+        &self.blind_copy
     }
 
     pub fn subject(&self) -> &str {
-        todo!()
+        &self.subject
     }
 
     pub fn body(&self) -> &str {
-        todo!()
+        &self.body
     }
 
     pub fn attachment(&self) -> &PdfAttachment {
-        todo!()
+        &self.attachment
     }
 }
 
 /// Construit l'email envoyé par le bailleur au locataire, quittance PDF en pièce jointe.
+/// La période est désignée par le mois de son début.
 pub fn build_receipt_email(receipt: &Receipt, pdf: Vec<u8>) -> Result<ReceiptEmail, MailError> {
-    todo!()
+    if pdf.is_empty() {
+        return Err(MailError::EmptyAttachment);
+    }
+    let landlord = receipt.landlord();
+    let tenant = receipt.tenant();
+    let period_start = receipt.period().start();
+    let period_label = french_month_and_year(period_start);
+    Ok(ReceiptEmail {
+        sender: EmailContact::from_party(landlord),
+        recipient: EmailContact::from_party(tenant),
+        blind_copy: landlord.email().to_owned(),
+        subject: format!("{} {period_label}", wording::SUBJECT_PREFIX),
+        body: format!(
+            "Bonjour {},\n\n\
+             Veuillez trouver ci-joint votre quittance de loyer pour {period_label}.\n\n\
+             Cordialement,\n\
+             {}\n",
+            tenant.name(),
+            landlord.name()
+        ),
+        attachment: PdfAttachment {
+            file_name: format!(
+                "{}-{}-{:02}.pdf",
+                wording::FILE_NAME_PREFIX,
+                period_start.year(),
+                month_number(period_start)
+            ),
+            content: pdf,
+        },
+    })
+}
+
+/// Par exemple « octobre 2026 ».
+fn french_month_and_year(date: Date) -> String {
+    let month_name = wording::FRENCH_MONTH_NAMES[usize::from(month_number(date)) - 1];
+    format!("{month_name} {}", date.year())
+}
+
+/// Numéro du mois, de 1 à 12.
+fn month_number(date: Date) -> u8 {
+    u8::from(date.month())
 }
 
 #[cfg(test)]

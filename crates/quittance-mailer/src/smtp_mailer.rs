@@ -1,6 +1,10 @@
-use lettre::{Message, SmtpTransport};
+use lettre::message::header::ContentType;
+use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart};
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Address, Message, SmtpTransport, Transport};
 
-use crate::{MailError, Mailer, ReceiptEmail, SmtpConfig};
+use crate::config::SmtpSecurity;
+use crate::{EmailContact, MailError, Mailer, ReceiptEmail, SmtpConfig};
 
 /// Envoi réel par SMTP via lettre.
 #[derive(Clone)]
@@ -9,19 +13,73 @@ pub struct SmtpMailer {
 }
 
 impl SmtpMailer {
+    /// Ne se connecte pas : la connexion est ouverte à chaque envoi.
     pub fn new(config: &SmtpConfig) -> Result<Self, MailError> {
-        todo!()
+        let builder = match config.security {
+            SmtpSecurity::StartTls => SmtpTransport::starttls_relay(&config.host),
+            SmtpSecurity::ImplicitTls => SmtpTransport::relay(&config.host),
+            SmtpSecurity::Unencrypted => Ok(SmtpTransport::builder_dangerous(&config.host)),
+        }
+        .map_err(|err| MailError::TransportSetup(Box::new(err)))?;
+        let builder = builder.port(config.port);
+        // Les identifiants ne circulent jamais en clair : sans chiffrement,
+        // seul le SMTP local de test est visé, et il n'exige pas d'authentification.
+        let transport = match config.security {
+            SmtpSecurity::StartTls | SmtpSecurity::ImplicitTls => builder
+                .credentials(Credentials::new(
+                    config.username.clone(),
+                    config.password.clone(),
+                ))
+                .build(),
+            SmtpSecurity::Unencrypted => builder.build(),
+        };
+        Ok(Self { transport })
     }
 }
 
 impl Mailer for SmtpMailer {
     fn send(&self, email: &ReceiptEmail) -> Result<(), MailError> {
-        todo!()
+        let message = to_lettre_message(email)?;
+        self.transport
+            .send(&message)
+            .map_err(|err| MailError::Delivery(Box::new(err)))?;
+        Ok(())
     }
 }
 
+/// lettre retire l'en-tête Bcc du message transmis et garde le bailleur
+/// dans l'enveloppe SMTP : le locataire ne voit pas la copie.
 fn to_lettre_message(email: &ReceiptEmail) -> Result<Message, MailError> {
-    todo!()
+    let attachment = email.attachment();
+    let content_type = ContentType::parse(attachment.content_type())
+        .map_err(|err| MailError::InvalidMessage(Box::new(err)))?;
+    Message::builder()
+        .from(to_mailbox(email.sender())?)
+        .to(to_mailbox(email.recipient())?)
+        .bcc(Mailbox::new(None, parse_address(email.blind_copy())?))
+        .subject(email.subject())
+        .multipart(
+            MultiPart::mixed()
+                .singlepart(SinglePart::plain(email.body().to_owned()))
+                .singlepart(
+                    Attachment::new(attachment.file_name().to_owned())
+                        .body(attachment.content().to_vec(), content_type),
+                ),
+        )
+        .map_err(|err| MailError::InvalidMessage(Box::new(err)))
+}
+
+fn to_mailbox(contact: &EmailContact) -> Result<Mailbox, MailError> {
+    Ok(Mailbox::new(
+        Some(contact.name().to_owned()),
+        parse_address(contact.email())?,
+    ))
+}
+
+fn parse_address(email: &str) -> Result<Address, MailError> {
+    email
+        .parse()
+        .map_err(|err| MailError::InvalidMessage(Box::new(err)))
 }
 
 #[cfg(test)]

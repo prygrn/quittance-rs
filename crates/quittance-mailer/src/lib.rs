@@ -3,9 +3,6 @@
 //! [`build_receipt_email`] est pure ; l'envoi passe par le trait [`Mailer`],
 //! implémenté par [`SmtpMailer`] à partir d'une [`SmtpConfig`] validée.
 
-// Temporaire : API en stubs `todo!()` le temps d'écrire les tests, retiré à l'implémentation.
-#![allow(unused_variables, dead_code)]
-
 mod config;
 mod email;
 mod error;
