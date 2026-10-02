@@ -128,24 +128,71 @@ mod tests {
             "jeanne@example.",
         ];
 
-        for email in malformed_emails {
+        assert_each_email_is_rejected(&malformed_emails);
+    }
+
+    #[test]
+    fn given_local_parts_with_forbidden_characters_when_creating_party_then_each_is_rejected() {
+        let emails_with_forbidden_characters = [
+            "jean,ne@example.fr",
+            "a<b>@example.fr",
+            "jean(ne)@example.fr",
+            "jean\"ne@example.fr",
+            "jean;ne@example.fr",
+        ];
+
+        assert_each_email_is_rejected(&emails_with_forbidden_characters);
+    }
+
+    #[test]
+    fn given_local_parts_with_misplaced_dots_when_creating_party_then_each_is_rejected() {
+        let emails_with_misplaced_dots = [
+            ".jeanne@example.fr",
+            "jeanne.@example.fr",
+            "jean..ne@example.fr",
+        ];
+
+        assert_each_email_is_rejected(&emails_with_misplaced_dots);
+    }
+
+    #[test]
+    fn given_domains_with_malformed_labels_when_creating_party_then_each_is_rejected() {
+        let emails_with_malformed_domains = [
+            "jeanne@example..fr",
+            "jeanne@-example.fr",
+            "jeanne@example-.fr",
+            "jeanne@exa_mple.fr",
+            "jeanne@example.f!r",
+        ];
+
+        assert_each_email_is_rejected(&emails_with_malformed_domains);
+    }
+
+    #[test]
+    fn given_well_formed_emails_when_creating_party_then_each_is_accepted() {
+        let well_formed_emails = [
+            "a@b.co",
+            "jeanne.martin+loyer@mail.example.fr",
+            "jeanne@mon-domaine.fr",
+            "o'neil@example.fr",
+            "!#$%&'*+/=?^_`{|}~-@example.fr",
+        ];
+
+        for email in well_formed_emails {
+            let result = Party::new(NAME, ADDRESS, email);
+
+            assert!(result.is_ok(), "{email} should be accepted, got {result:?}");
+        }
+    }
+
+    fn assert_each_email_is_rejected(emails: &[&str]) {
+        for email in emails {
             let result = Party::new(NAME, ADDRESS, email);
 
             assert!(
                 matches!(result, Err(PartyError::InvalidEmail(_))),
                 "{email} should be rejected, got {result:?}"
             );
-        }
-    }
-
-    #[test]
-    fn given_well_formed_emails_when_creating_party_then_each_is_accepted() {
-        let well_formed_emails = ["a@b.co", "jeanne.martin+loyer@mail.example.fr"];
-
-        for email in well_formed_emails {
-            let result = Party::new(NAME, ADDRESS, email);
-
-            assert!(result.is_ok(), "{email} should be accepted, got {result:?}");
         }
     }
 }
