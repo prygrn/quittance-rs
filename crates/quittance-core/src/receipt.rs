@@ -31,41 +31,65 @@ pub struct Receipt {
 
 impl Receipt {
     pub fn landlord(&self) -> &Party {
-        todo!()
+        &self.landlord
     }
 
     pub fn tenant(&self) -> &Party {
-        todo!()
+        &self.tenant
     }
 
     pub fn property_address(&self) -> &str {
-        todo!()
+        &self.property_address
     }
 
     pub fn period(&self) -> RentPeriod {
-        todo!()
+        self.period
     }
 
     pub fn rent(&self) -> Money {
-        todo!()
+        self.rent
     }
 
     pub fn charges(&self) -> Money {
-        todo!()
+        self.charges
     }
 
     pub fn payment_date(&self) -> Date {
-        todo!()
+        self.payment_date
     }
 
     pub fn total(&self) -> Money {
-        todo!()
+        Money::from_cents(self.rent.cents() + self.charges.cents())
     }
 }
 
 /// Le bailleur provient de la configuration, déjà validé via [`Party::new`].
 pub fn validate_receipt(landlord: Party, input: ReceiptInput) -> Result<Receipt, ReceiptError> {
-    todo!()
+    let tenant = Party::new(
+        &input.tenant_name,
+        &input.tenant_address,
+        &input.tenant_email,
+    )?;
+    let property_address = input.property_address.trim();
+    if property_address.is_empty() {
+        return Err(ReceiptError::MissingPropertyAddress);
+    }
+    let period = RentPeriod::new(input.period_start, input.period_end)?;
+    if input.rent_cents.checked_add(input.charges_cents).is_none() {
+        return Err(ReceiptError::TotalOverflow {
+            rent_cents: input.rent_cents,
+            charges_cents: input.charges_cents,
+        });
+    }
+    Ok(Receipt {
+        landlord,
+        tenant,
+        property_address: property_address.to_owned(),
+        period,
+        rent: Money::from_cents(input.rent_cents),
+        charges: Money::from_cents(input.charges_cents),
+        payment_date: input.payment_date,
+    })
 }
 
 #[cfg(test)]

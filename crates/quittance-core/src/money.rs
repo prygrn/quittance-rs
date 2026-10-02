@@ -6,11 +6,11 @@ pub struct Money {
 
 impl Money {
     pub fn from_cents(cents: u64) -> Self {
-        todo!()
+        Self { cents }
     }
 
     pub fn cents(&self) -> u64 {
-        todo!()
+        self.cents
     }
 }
 

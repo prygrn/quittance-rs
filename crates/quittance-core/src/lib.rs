@@ -2,9 +2,6 @@
 //!
 //! Un [`Receipt`] n'existe que validé : il se construit uniquement via [`validate_receipt`].
 
-// Temporaire : API en stubs `todo!()`, retiré à l'implémentation.
-#![allow(unused_variables, dead_code)]
-
 mod error;
 mod money;
 mod party;

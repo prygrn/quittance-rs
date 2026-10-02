@@ -11,20 +11,55 @@ pub struct Party {
 
 impl Party {
     pub fn new(name: &str, address: &str, email: &str) -> Result<Self, PartyError> {
-        todo!()
+        let name = name.trim();
+        let address = address.trim();
+        let email = email.trim();
+        if name.is_empty() {
+            return Err(PartyError::MissingName);
+        }
+        if address.is_empty() {
+            return Err(PartyError::MissingAddress);
+        }
+        if email.is_empty() {
+            return Err(PartyError::MissingEmail);
+        }
+        if !is_well_formed_email(email) {
+            return Err(PartyError::InvalidEmail(email.to_owned()));
+        }
+        Ok(Self {
+            name: name.to_owned(),
+            address: address.to_owned(),
+            email: email.to_owned(),
+        })
     }
 
     pub fn name(&self) -> &str {
-        todo!()
+        &self.name
     }
 
     pub fn address(&self) -> &str {
-        todo!()
+        &self.address
     }
 
     pub fn email(&self) -> &str {
-        todo!()
+        &self.email
     }
+}
+
+/// Vérification de forme volontairement simple : la preuve d'existence
+/// de l'adresse viendra de la réception du mail, pas d'une regex.
+fn is_well_formed_email(email: &str) -> bool {
+    if email.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let Some((local_part, domain)) = email.split_once('@') else {
+        return false;
+    };
+    !local_part.is_empty()
+        && !domain.contains('@')
+        && domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
 }
 
 #[cfg(test)]

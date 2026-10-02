@@ -11,15 +11,18 @@ pub struct RentPeriod {
 
 impl RentPeriod {
     pub(crate) fn new(start: Date, end: Date) -> Result<Self, ReceiptError> {
-        todo!()
+        if start > end {
+            return Err(ReceiptError::InvertedPeriod { start, end });
+        }
+        Ok(Self { start, end })
     }
 
     pub fn start(&self) -> Date {
-        todo!()
+        self.start
     }
 
     pub fn end(&self) -> Date {
-        todo!()
+        self.end
     }
 }
 
