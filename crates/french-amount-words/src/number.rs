@@ -40,12 +40,28 @@ const TENS: [(u64, &str); 6] = [
 /// s'accorder devant eux.
 const SCALE_NOUNS: [(u64, &str); 2] = [(MILLIARD, "milliard"), (MILLION, "million")];
 
-/// Accord de « vingt » et « cent » quand ils terminent un groupe de trois chiffres.
+/// Nombre grammatical d'un mot, qui décide de sa marque du pluriel.
 #[derive(Clone, Copy)]
-enum Agreement {
+enum GrammaticalNumber {
+    Singular,
     Plural,
-    /// Devant « mille », adjectif numéral : quatre-vingt mille, deux cent mille.
-    Invariable,
+}
+
+impl GrammaticalNumber {
+    fn of_quantity(quantity: u64) -> Self {
+        if quantity >= SMALLEST_PLURAL_QUANTITY {
+            Self::Plural
+        } else {
+            Self::Singular
+        }
+    }
+
+    fn plural_mark(self) -> &'static str {
+        match self {
+            Self::Singular => "",
+            Self::Plural => PLURAL_MARK,
+        }
+    }
 }
 
 /// Écrit un nombre entier en toutes lettres, en graphie traditionnelle.
@@ -67,8 +83,8 @@ pub fn number_to_words(value: u64) -> Result<String, AmountWordsError> {
         if count > 0 {
             parts.push(format!(
                 "{} {noun}{}",
-                group_words(count, Agreement::Plural),
-                plural_mark(count >= SMALLEST_PLURAL_QUANTITY)
+                group_words(count, GrammaticalNumber::Plural),
+                GrammaticalNumber::of_quantity(count).plural_mark()
             ));
         }
     }
@@ -77,22 +93,25 @@ pub fn number_to_words(value: u64) -> Result<String, AmountWordsError> {
     match thousands {
         0 => {}
         1 => parts.push(THOUSAND_WORD.to_owned()),
+        // Devant « mille », adjectif numéral, vingt et cent restent invariables :
+        // quatre-vingt mille, deux cent mille.
         _ => parts.push(format!(
             "{} {THOUSAND_WORD}",
-            group_words(thousands, Agreement::Invariable)
+            group_words(thousands, GrammaticalNumber::Singular)
         )),
     }
 
     let units = value % THOUSAND;
     if units > 0 {
-        parts.push(group_words(units, Agreement::Plural));
+        parts.push(group_words(units, GrammaticalNumber::Plural));
     }
 
     Ok(parts.join(WORD_SEPARATOR))
 }
 
-/// Écrit un groupe de 1 à 999.
-fn group_words(value: u64, agreement: Agreement) -> String {
+/// Écrit un groupe de 1 à 999 ; `ending_number` est le nombre que prennent « vingt » et
+/// « cent » multipliés quand ils terminent le groupe.
+fn group_words(value: u64, ending_number: GrammaticalNumber) -> String {
     let hundreds = value / HUNDRED;
     let below_hundred = value % HUNDRED;
 
@@ -101,23 +120,27 @@ fn group_words(value: u64, agreement: Agreement) -> String {
         0 => {}
         1 => parts.push(HUNDRED_WORD.to_owned()),
         _ => {
-            let is_plural = below_hundred == 0 && matches!(agreement, Agreement::Plural);
+            let hundred_number = if below_hundred == 0 {
+                ending_number
+            } else {
+                GrammaticalNumber::Singular
+            };
             parts.push(format!(
                 "{} {HUNDRED_WORD}{}",
                 below_twenty_word(hundreds),
-                plural_mark(is_plural)
+                hundred_number.plural_mark()
             ));
         }
     }
     if below_hundred > 0 {
-        parts.push(below_hundred_words(below_hundred, agreement));
+        parts.push(below_hundred_words(below_hundred, ending_number));
     }
 
     parts.join(WORD_SEPARATOR)
 }
 
 /// Écrit un nombre de 1 à 99, en liant dizaines et unités par un trait d'union ou par « et ».
-fn below_hundred_words(value: u64, agreement: Agreement) -> String {
+fn below_hundred_words(value: u64, ending_number: GrammaticalNumber) -> String {
     let Some(&(tens_value, tens_word)) = TENS
         .iter()
         .rev()
@@ -129,8 +152,12 @@ fn below_hundred_words(value: u64, agreement: Agreement) -> String {
     let is_multiplied_vingt = tens_value == MULTIPLIED_VINGT;
     let remainder = value - tens_value;
     if remainder == 0 {
-        let is_plural = is_multiplied_vingt && matches!(agreement, Agreement::Plural);
-        return format!("{tens_word}{}", plural_mark(is_plural));
+        let tens_number = if is_multiplied_vingt {
+            ending_number
+        } else {
+            GrammaticalNumber::Singular
+        };
+        return format!("{tens_word}{}", tens_number.plural_mark());
     }
 
     let remainder_word = below_twenty_word(remainder);
@@ -139,10 +166,6 @@ fn below_hundred_words(value: u64, agreement: Agreement) -> String {
     } else {
         format!("{tens_word}-{remainder_word}")
     }
-}
-
-fn plural_mark(is_plural: bool) -> &'static str {
-    if is_plural { PLURAL_MARK } else { "" }
 }
 
 fn below_twenty_word(value: u64) -> &'static str {
