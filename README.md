@@ -7,8 +7,23 @@ Générateur de quittances de loyer, pour usage personnel (bailleur particulier)
 - Écran unique : sélection d'un template de quittance + saisie des champs (locataire, logement, période, montant, etc.)
 - Génération du document à partir du template (HTML/CSS → PDF)
 - Preview du document avant envoi
-- Signature électronique (image de signature superposée au PDF)
+- Signature manuscrite protégée contre la copie (voir ci-dessous)
 - Envoi automatique au locataire par email (SMTP)
+
+## Signature protégée contre la copie
+
+Une quittance porte ta signature et part chez un tiers. Dans un PDF classique, l'image de signature y est incorporée telle quelle : n'importe qui peut l'extraire en un clic, en pleine résolution et avec sa transparence, puis la coller sur un autre document.
+
+quittance-rs ne met jamais l'image d'origine dans le PDF. Avant chaque envoi, la signature est :
+
+- **fusionnée avec une mention propre à la quittance** (période, locataire), écrite en travers de la signature et aplatie dans la même image : une signature extraite reste liée à cette quittance, toute réutilisation se voit ;
+- **dégradée pour la copie** : résolution limitée au strict nécessaire pour l'impression, fond blanc à la place de la transparence. Elle se colle mal sur un autre document.
+
+Une capture d'écran reste possible ; elle ne donne qu'une image marquée et de qualité réduite.
+
+## Évolutions prévues
+
+- **Signature électronique certifiée (PAdES)** : seule vraie preuve d'authenticité. Un certificat scelle le PDF et toute modification devient détectable. Elle remplacera à terme la signature image.
 
 ## Stack
 
