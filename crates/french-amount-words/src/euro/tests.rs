@@ -119,3 +119,21 @@ fn given_euro_part_above_max_value_when_converted_then_returns_value_too_large_e
         );
     }
 }
+
+#[test]
+fn given_euro_part_above_max_value_when_converted_then_error_carries_euro_part_not_cents() {
+    // Arrange
+    let too_large_euro_part = MAX_VALUE + 1;
+    let amount = too_large_euro_part * CENTS_PER_EURO;
+
+    // Act
+    let result = euro_amount_to_words(amount);
+
+    // Assert
+    assert_eq!(
+        result,
+        Err(AmountWordsError::ValueTooLarge {
+            value: too_large_euro_part
+        })
+    );
+}

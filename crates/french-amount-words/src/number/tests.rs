@@ -152,7 +152,12 @@ fn given_hundreds_followed_by_number_when_converted_then_cent_stays_singular() {
 #[test]
 fn given_one_thousand_when_converted_then_returns_mille_without_un() {
     // Arrange
-    let cases = [(1_000, "mille"), (1_001, "mille un"), (1_100, "mille cent")];
+    let cases = [
+        (1_000, "mille"),
+        (1_001, "mille un"),
+        (1_080, "mille quatre-vingts"),
+        (1_100, "mille cent"),
+    ];
 
     // Act & Assert
     assert_conversions(number_to_words, &cases);
@@ -181,6 +186,8 @@ fn given_vingt_or_cent_before_mille_when_converted_then_they_stay_singular() {
     let cases = [
         (80_000, "quatre-vingt mille"),
         (81_000, "quatre-vingt-un mille"),
+        (100_000, "cent mille"),
+        (180_000, "cent quatre-vingt mille"),
         (200_000, "deux cent mille"),
         (280_000, "deux cent quatre-vingt mille"),
     ];
@@ -196,6 +203,7 @@ fn given_millions_when_converted_then_million_is_a_noun_that_takes_plural() {
         (1_000_000, "un million"),
         (2_000_000, "deux millions"),
         (21_000_000, "vingt et un millions"),
+        (100_000_000, "cent millions"),
         (1_000_200, "un million deux cents"),
         (1_080_000, "un million quatre-vingt mille"),
         (2_001_001, "deux millions mille un"),
