@@ -1,0 +1,11 @@
+.env
+.env.*
+node_modules/
+dist/
+build/
+_setup/
+.claude
+
+# Consuming-project extension point — never populated in this repo,
+# each project supplies its own content locally (see README)
+rules/project
