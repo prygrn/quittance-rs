@@ -1,8 +1,38 @@
 use headless_chrome::types::PrintToPdfOptions;
 
+/// Mise en page d'une quittance ; le protocole CDP attend des pouces.
+struct ReceiptPageLayout;
+
+impl ReceiptPageLayout {
+    const MILLIMETERS_PER_INCH: f64 = 25.4;
+    const A4_WIDTH_MILLIMETERS: f64 = 210.0;
+    const A4_HEIGHT_MILLIMETERS: f64 = 297.0;
+    const MARGIN_MILLIMETERS: f64 = 10.0;
+
+    fn to_inches(millimeters: f64) -> f64 {
+        millimeters / Self::MILLIMETERS_PER_INCH
+    }
+}
+
 /// Options d'impression d'une quittance : A4, marges uniformes, fond imprimé.
 pub(crate) fn build_print_options() -> PrintToPdfOptions {
-    todo!()
+    let margin = Some(ReceiptPageLayout::to_inches(
+        ReceiptPageLayout::MARGIN_MILLIMETERS,
+    ));
+    PrintToPdfOptions {
+        print_background: Some(true),
+        paper_width: Some(ReceiptPageLayout::to_inches(
+            ReceiptPageLayout::A4_WIDTH_MILLIMETERS,
+        )),
+        paper_height: Some(ReceiptPageLayout::to_inches(
+            ReceiptPageLayout::A4_HEIGHT_MILLIMETERS,
+        )),
+        margin_top: margin,
+        margin_bottom: margin,
+        margin_left: margin,
+        margin_right: margin,
+        ..PrintToPdfOptions::default()
+    }
 }
 
 #[cfg(test)]

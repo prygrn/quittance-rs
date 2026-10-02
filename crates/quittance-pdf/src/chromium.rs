@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
-use headless_chrome::LaunchOptions;
+use headless_chrome::protocol::cdp::Page;
+use headless_chrome::{Browser, LaunchOptions};
 
+use crate::print_options::build_print_options;
 use crate::{PdfError, PdfRenderer};
 
 /// Rendu PDF par un Chrome ou Chromium headless lancé à chaque rendu.
@@ -13,17 +15,42 @@ pub struct ChromiumPdfRenderer {
 impl ChromiumPdfRenderer {
     /// Crée un renderer pour le binaire indiqué ; échoue s'il n'existe pas.
     pub fn new(chrome_path: impl Into<PathBuf>) -> Result<Self, PdfError> {
-        todo!()
+        let chrome_path = chrome_path.into();
+        if !chrome_path.is_file() {
+            return Err(PdfError::ChromeNotFound { path: chrome_path });
+        }
+        Ok(Self { chrome_path })
     }
 
     fn build_launch_options(&self) -> LaunchOptions<'_> {
-        todo!()
+        LaunchOptions {
+            headless: true,
+            path: Some(self.chrome_path.clone()),
+            ..LaunchOptions::default()
+        }
     }
 }
 
 impl PdfRenderer for ChromiumPdfRenderer {
     fn render(&self, html: &str) -> Result<Vec<u8>, PdfError> {
-        todo!()
+        let browser = Browser::new(self.build_launch_options())
+            .map_err(|err| PdfError::BrowserLaunch(err.into()))?;
+        let tab = browser
+            .new_tab()
+            .map_err(|err| PdfError::BrowserLaunch(err.into()))?;
+        let frame_id = tab
+            .call_method(Page::GetFrameTree(None))
+            .map_err(|err| PdfError::Rendering(err.into()))?
+            .frame_tree
+            .frame
+            .id;
+        tab.call_method(Page::SetDocumentContent {
+            frame_id,
+            html: html.to_owned(),
+        })
+        .map_err(|err| PdfError::Rendering(err.into()))?;
+        tab.print_to_pdf(Some(build_print_options()))
+            .map_err(|err| PdfError::Rendering(err.into()))
     }
 }
 
