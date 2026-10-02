@@ -9,3 +9,10 @@ repository.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+thiserror = "2.0.21"
+time = "0.3.55"
+
+[dev-dependencies]
+time = { version = "0.3.55", features = ["macros"] }
