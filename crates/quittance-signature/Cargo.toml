@@ -1,0 +1,19 @@
+[package]
+name = "quittance-signature"
+version = "0.1.0"
+description = "Chargement de l'image de signature et marquage anti-copie propre à chaque quittance"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+ab_glyph = "0.2.32"
+base64 = "0.23.1"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg"] }
+imageproc = { version = "0.27.0", default-features = false, features = ["text"] }
+quittance-core = { path = "../quittance-core" }
+thiserror = "2.0.21"
