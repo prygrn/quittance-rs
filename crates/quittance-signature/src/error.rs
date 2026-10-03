@@ -17,6 +17,10 @@ pub enum SignatureError {
     },
     #[error("signature file `{}` exceeds {MAX_FILE_SIZE_BYTES} bytes", path.display())]
     TooLarge { path: PathBuf },
+    /// Dimensions ou mémoire de décodage au-delà de [`crate::MAX_INPUT_DIMENSION`]
+    /// ou [`crate::MAX_DECODE_ALLOCATION_BYTES`].
+    #[error("signature image `{}` exceeds the decoding limits", path.display())]
+    ImageTooLarge { path: PathBuf },
     #[error("signature file `{}` is neither a PNG nor a JPEG image", path.display())]
     UnsupportedFormat { path: PathBuf },
     #[error("signature file `{}` cannot be decoded: {source}", path.display())]

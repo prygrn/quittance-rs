@@ -6,7 +6,10 @@ use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use image::{DynamicImage, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
+use image::codecs::jpeg::JpegEncoder;
+use image::{
+    DynamicImage, ExtendedColorType, ImageEncoder, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage,
+};
 use quittance_core::{Date, Party, Receipt, ReceiptInput, validate_receipt};
 
 use crate::{ProtectedSignature, SignatureImage, load_signature};
@@ -126,4 +129,44 @@ pub(crate) fn sample_receipt() -> Receipt {
 
 pub(crate) fn count_pixels_differing_from(image: &RgbImage, color: Rgb<u8>) -> usize {
     image.pixels().filter(|pixel| **pixel != color).count()
+}
+
+/// Luminance perçue (Rec. 601), comme la calculerait un logiciel de retouche.
+pub(crate) fn luminance(pixel: Rgb<u8>) -> f32 {
+    let [red, green, blue] = pixel.0;
+    0.299 * f32::from(red) + 0.587 * f32::from(green) + 0.114 * f32::from(blue)
+}
+
+/// Bloc TIFF minimal (petit-boutiste) portant la seule étiquette EXIF d'orientation.
+fn exif_orientation_chunk(orientation: u8) -> Vec<u8> {
+    const ORIENTATION_TAG: u16 = 0x0112;
+    const SHORT_TYPE: u16 = 3;
+    const FIRST_IFD_OFFSET: u32 = 8;
+    let mut chunk = b"II*\0".to_vec();
+    chunk.extend_from_slice(&FIRST_IFD_OFFSET.to_le_bytes());
+    chunk.extend_from_slice(&1u16.to_le_bytes());
+    chunk.extend_from_slice(&ORIENTATION_TAG.to_le_bytes());
+    chunk.extend_from_slice(&SHORT_TYPE.to_le_bytes());
+    chunk.extend_from_slice(&1u32.to_le_bytes());
+    chunk.extend_from_slice(&u16::from(orientation).to_le_bytes());
+    chunk.extend_from_slice(&0u16.to_le_bytes());
+    chunk.extend_from_slice(&0u32.to_le_bytes());
+    chunk
+}
+
+pub(crate) fn encoded_jpeg_with_exif_orientation(image: &RgbImage, orientation: u8) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let mut encoder = JpegEncoder::new(&mut bytes);
+    encoder
+        .set_exif_metadata(exif_orientation_chunk(orientation))
+        .unwrap();
+    encoder
+        .write_image(
+            image.as_raw(),
+            image.width(),
+            image.height(),
+            ExtendedColorType::Rgb8,
+        )
+        .unwrap();
+    bytes
 }

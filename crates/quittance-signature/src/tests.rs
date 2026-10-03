@@ -7,20 +7,30 @@ use quittance_core::Receipt;
 
 use crate::mention::receipt_mention;
 use crate::test_support::{
-    TemporaryFile, WHITE, count_pixels_differing_from, date, decoded_output, encoded_jpeg,
-    encoded_png, loaded_signature, opaque_ink_image, receipt_for, sample_receipt,
-    stroke_on_transparent_background, temporary_path, uniform_image,
+    INK, TemporaryFile, WHITE, count_pixels_differing_from, date, decoded_output, encoded_jpeg,
+    encoded_jpeg_with_exif_orientation, encoded_png, loaded_signature, luminance, opaque_ink_image,
+    receipt_for, sample_receipt, stroke_on_transparent_background, temporary_path, uniform_image,
 };
 use crate::{
-    MAX_FILE_SIZE_BYTES, MAX_OUTPUT_WIDTH, ProtectedSignature, SignatureError, SignatureImage,
-    load_signature,
+    MAX_DECODE_ALLOCATION_BYTES, MAX_FILE_SIZE_BYTES, MAX_INPUT_DIMENSION, MAX_OUTPUT_HEIGHT,
+    MAX_OUTPUT_WIDTH, ProtectedSignature, SignatureError, SignatureImage, load_signature,
 };
 
 const EXPECTED_MAX_FILE_SIZE_BYTES: u64 = 5 * 1024 * 1024;
-const EXPECTED_MAX_OUTPUT_WIDTH: u32 = 600;
+const EXPECTED_MAX_OUTPUT_WIDTH: u32 = 400;
+const EXPECTED_MAX_OUTPUT_HEIGHT: u32 = 200;
+const EXPECTED_MAX_INPUT_DIMENSION: u32 = 8000;
+const EXPECTED_MAX_DECODE_ALLOCATION_BYTES: u64 = 64 * 1024 * 1024;
 const EXPECTED_DATA_URI_PREFIX: &str = "data:image/png;base64,";
 const PNG_SIGNATURE_BYTES: [u8; 8] = [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n'];
+const JPEG_START_BYTES: [u8; 3] = [0xFF, 0xD8, 0xFF];
 const WHITE_RGB: Rgb<u8> = Rgb([255, 255, 255]);
+/// Seuil d'un réglage de niveaux qui isolerait l'encre : sous ce seuil, le pixel est de l'encre.
+const INK_LUMINANCE_THRESHOLD: f32 = 128.0;
+/// Côté des carreaux qui doivent tous porter une partie de la mention.
+const COVERAGE_TILE_SIZE: u32 = 20;
+/// Orientation EXIF 6 : l'image stockée doit être tournée de 90° dans le sens horaire.
+const EXIF_ROTATE_90_CLOCKWISE: u8 = 6;
 
 type Loader = fn(&Path) -> Result<SignatureImage, SignatureError>;
 type Protection = fn(&SignatureImage, &Receipt) -> ProtectedSignature;
@@ -46,6 +56,12 @@ fn given_crate_when_inspecting_public_api_then_exposes_loader_protection_and_bou
     // Assert
     assert_eq!(MAX_FILE_SIZE_BYTES, EXPECTED_MAX_FILE_SIZE_BYTES);
     assert_eq!(MAX_OUTPUT_WIDTH, EXPECTED_MAX_OUTPUT_WIDTH);
+    assert_eq!(MAX_OUTPUT_HEIGHT, EXPECTED_MAX_OUTPUT_HEIGHT);
+    assert_eq!(MAX_INPUT_DIMENSION, EXPECTED_MAX_INPUT_DIMENSION);
+    assert_eq!(
+        MAX_DECODE_ALLOCATION_BYTES,
+        EXPECTED_MAX_DECODE_ALLOCATION_BYTES
+    );
     let _ = (loader, protection, data_uri);
 }
 
@@ -146,6 +162,56 @@ fn given_missing_file_when_loading_then_file_is_unreadable() {
     assert!(matches!(result, Err(SignatureError::Unreadable { .. })));
 }
 
+#[cfg(unix)]
+#[test]
+fn given_file_without_read_permission_when_loading_then_file_is_unreadable() {
+    use std::os::unix::fs::PermissionsExt;
+
+    // Arrange
+    let file = TemporaryFile::with_contents(
+        "forbidden.png",
+        &encoded_png(&stroke_on_transparent_background(40, 20)),
+    );
+    std::fs::set_permissions(file.path(), std::fs::Permissions::from_mode(0o000)).unwrap();
+    // Exécuté en root, le fichier reste lisible : le cas n'est alors pas reproductible.
+    if std::fs::read(file.path()).is_ok() {
+        return;
+    }
+
+    // Act
+    let result = load_signature(file.path());
+
+    // Assert
+    assert!(matches!(result, Err(SignatureError::Unreadable { .. })));
+}
+
+#[test]
+fn given_jpeg_header_followed_by_garbage_when_loading_then_image_is_undecodable() {
+    // Arrange
+    let mut contents = JPEG_START_BYTES.to_vec();
+    contents.extend_from_slice(b"not an image");
+    let file = TemporaryFile::with_contents("corrupt.jpg", &contents);
+
+    // Act
+    let result = load_signature(file.path());
+
+    // Assert
+    assert!(matches!(result, Err(SignatureError::Undecodable { .. })));
+}
+
+#[test]
+fn given_png_taller_than_input_limit_when_loading_then_image_is_too_large() {
+    // Arrange
+    let image = uniform_image(1, MAX_INPUT_DIMENSION + 1, WHITE);
+    let file = TemporaryFile::with_contents("beyond-limit.png", &encoded_png(&image));
+
+    // Act
+    let result = load_signature(file.path());
+
+    // Assert
+    assert!(matches!(result, Err(SignatureError::ImageTooLarge { .. })));
+}
+
 #[test]
 fn given_png_header_followed_by_garbage_when_loading_then_image_is_undecodable() {
     // Arrange
@@ -173,15 +239,42 @@ fn given_wide_signature_when_protecting_then_output_width_is_capped_at_maximum()
 }
 
 #[test]
+fn given_tall_signature_when_protecting_then_output_height_is_capped_at_maximum() {
+    // Arrange
+    let signature = uniform_image(100, MAX_OUTPUT_HEIGHT * 5, WHITE);
+
+    // Act
+    let output = protected_output("tall.png", &signature);
+
+    // Assert
+    assert_eq!(output.dimensions(), (20, MAX_OUTPUT_HEIGHT));
+}
+
+#[test]
+fn given_jpeg_with_rotated_exif_orientation_when_protecting_then_output_is_upright() {
+    // Arrange
+    let jpeg =
+        encoded_jpeg_with_exif_orientation(&opaque_ink_image(40, 20), EXIF_ROTATE_90_CLOCKWISE);
+    let file = TemporaryFile::with_contents("rotated.jpg", &jpeg);
+    let signature = load_signature(file.path()).unwrap();
+
+    // Act
+    let protected = signature.protect_for_receipt(&sample_receipt());
+
+    // Assert
+    assert_eq!(decoded_output(&protected).dimensions(), (20, 40));
+}
+
+#[test]
 fn given_wide_signature_when_protecting_then_aspect_ratio_is_preserved() {
     // Arrange
-    let signature = uniform_image(MAX_OUTPUT_WIDTH * 2, 400, WHITE);
+    let signature = uniform_image(MAX_OUTPUT_WIDTH * 2, 200, WHITE);
 
     // Act
     let output = protected_output("ratio.png", &signature);
 
     // Assert
-    assert_eq!(output.dimensions(), (MAX_OUTPUT_WIDTH, 200));
+    assert_eq!(output.dimensions(), (MAX_OUTPUT_WIDTH, 100));
 }
 
 #[test]
@@ -238,23 +331,42 @@ fn given_blank_signature_when_protecting_then_mention_alters_pixels() {
 }
 
 #[test]
-fn given_blank_signature_when_protecting_then_mention_covers_every_quadrant() {
+fn given_blank_signature_when_protecting_then_every_tile_carries_mention() {
     // Arrange
-    let size = 300;
-    let half = size / 2;
+    let size = COVERAGE_TILE_SIZE * 10;
     let signature = uniform_image(size, size, WHITE);
 
     // Act
-    let output = protected_output("quadrants.png", &signature);
+    let output = protected_output("coverage.png", &signature);
 
     // Assert
-    for (left, top) in [(0, 0), (half, 0), (0, half), (half, half)] {
-        let quadrant = output.view(left, top, half, half).to_image();
-        assert!(
-            count_pixels_differing_from(&quadrant, WHITE_RGB) > 0,
-            "quadrant at ({left}, {top}) carries no mention"
-        );
+    for top in (0..size).step_by(COVERAGE_TILE_SIZE as usize) {
+        for left in (0..size).step_by(COVERAGE_TILE_SIZE as usize) {
+            let tile = output
+                .view(left, top, COVERAGE_TILE_SIZE, COVERAGE_TILE_SIZE)
+                .to_image();
+            assert!(
+                count_pixels_differing_from(&tile, WHITE_RGB) > 0,
+                "tile at ({left}, {top}) carries no mention"
+            );
+        }
     }
+}
+
+#[test]
+fn given_ink_signature_when_thresholding_output_luminance_then_mention_has_cut_the_ink() {
+    // Arrange
+    let signature = uniform_image(200, 80, INK);
+
+    // Act
+    let output = protected_output("ink.png", &signature);
+
+    // Assert
+    let cut_ink_pixel_count = output
+        .pixels()
+        .filter(|pixel| luminance(**pixel) >= INK_LUMINANCE_THRESHOLD)
+        .count();
+    assert!(cut_ink_pixel_count > 0);
 }
 
 #[test]

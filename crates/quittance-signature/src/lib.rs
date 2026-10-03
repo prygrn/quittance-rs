@@ -18,6 +18,17 @@ pub use protection::ProtectedSignature;
 /// de kilo-octets, au-delà le fichier n'est vraisemblablement pas une signature.
 pub const MAX_FILE_SIZE_BYTES: u64 = 5 * 1024 * 1024;
 
+/// Côté maximal, en pixels, d'une image acceptée au décodage : une signature, même
+/// photographiée, n'a pas besoin de plus.
+pub const MAX_INPUT_DIMENSION: u32 = 8000;
+
+/// Mémoire maximale allouée par le décodeur : un petit fichier très compressé ne peut
+/// pas réclamer plusieurs gigaoctets.
+pub const MAX_DECODE_ALLOCATION_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Hauteur maximale de la signature protégée : environ 2,5 cm à 200 dpi.
+pub const MAX_OUTPUT_HEIGHT: u32 = 200;
+
 /// Largeur maximale de la signature protégée : 600 pixels couvrent environ 5 cm à 300 dpi,
 /// la largeur d'un bloc de signature imprimé, sans offrir de copie haute définition.
 pub const MAX_OUTPUT_WIDTH: u32 = 600;
