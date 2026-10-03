@@ -5,6 +5,7 @@
 //! ([`SignatureImage::protect_for_receipt`]) : mention de la quittance incrustée en travers,
 //! résolution réduite, fond blanc opaque. L'image d'origine ne quitte jamais ce crate.
 
+mod degradation;
 mod error;
 mod loading;
 mod mention;
@@ -29,9 +30,9 @@ pub const MAX_DECODE_ALLOCATION_BYTES: u64 = 64 * 1024 * 1024;
 /// Hauteur maximale de la signature protégée : environ 2,5 cm à 200 dpi.
 pub const MAX_OUTPUT_HEIGHT: u32 = 200;
 
-/// Largeur maximale de la signature protégée : 600 pixels couvrent environ 5 cm à 300 dpi,
-/// la largeur d'un bloc de signature imprimé, sans offrir de copie haute définition.
-pub const MAX_OUTPUT_WIDTH: u32 = 600;
+/// Largeur maximale de la signature protégée : 400 pixels couvrent environ 5 cm à 200 dpi,
+/// assez pour l'impression d'une quittance, trop peu pour une copie exploitable.
+pub const MAX_OUTPUT_WIDTH: u32 = 400;
 
 #[cfg(test)]
 mod test_support;

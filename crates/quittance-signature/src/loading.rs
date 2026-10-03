@@ -1,10 +1,13 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::path::Path;
 
-use image::{DynamicImage, ImageFormat};
+use image::{DynamicImage, ImageDecoder, ImageError, ImageFormat, ImageReader, Limits, RgbImage};
 
-use crate::{MAX_FILE_SIZE_BYTES, SignatureError};
+use crate::degradation::degraded;
+use crate::{
+    MAX_DECODE_ALLOCATION_BYTES, MAX_FILE_SIZE_BYTES, MAX_INPUT_DIMENSION, SignatureError,
+};
 
 /// Premiers octets identifiant chaque format accepté.
 mod magic_bytes {
@@ -12,27 +15,34 @@ mod magic_bytes {
     pub const JPEG: &[u8] = &[0xFF, 0xD8, 0xFF];
 }
 
-/// Image de signature chargée et validée, telle que fournie par le bailleur.
-/// Elle ne sort du crate que protégée, via [`SignatureImage::protect_for_receipt`].
+/// Signature chargée, déjà dégradée : fond blanc, orientation appliquée, taille réduite.
+/// L'original en pleine résolution n'est pas conservé ; la signature ne sort du crate
+/// que protégée, via [`SignatureImage::protect_for_receipt`].
 #[derive(Debug, Clone)]
 pub struct SignatureImage {
-    pub(crate) image: DynamicImage,
+    pub(crate) canvas: RgbImage,
 }
 
 /// Lit le fichier de signature et le valide : taille bornée par
-/// [`crate::MAX_FILE_SIZE_BYTES`], format PNG ou JPEG reconnu à ses premiers octets.
+/// [`crate::MAX_FILE_SIZE_BYTES`], format PNG ou JPEG reconnu à ses premiers octets,
+/// décodage borné par [`crate::MAX_INPUT_DIMENSION`] et [`crate::MAX_DECODE_ALLOCATION_BYTES`].
 pub fn load_signature(path: &Path) -> Result<SignatureImage, SignatureError> {
     let bytes = read_bounded(path)?;
     let format = detected_format(&bytes).ok_or_else(|| SignatureError::UnsupportedFormat {
         path: path.to_owned(),
     })?;
-    let image = image::load_from_memory_with_format(&bytes, format).map_err(|source| {
-        SignatureError::Undecodable {
+    let image = oriented_image(&bytes, format).map_err(|source| match source {
+        ImageError::Limits(_) => SignatureError::ImageTooLarge {
+            path: path.to_owned(),
+        },
+        source => SignatureError::Undecodable {
             path: path.to_owned(),
             source,
-        }
+        },
     })?;
-    Ok(SignatureImage { image })
+    Ok(SignatureImage {
+        canvas: degraded(&image),
+    })
 }
 
 /// Lit au plus un octet de plus que la limite : un fichier trop gros est détecté
@@ -63,4 +73,23 @@ fn detected_format(bytes: &[u8]) -> Option<ImageFormat> {
     } else {
         None
     }
+}
+
+/// Décode sous limites puis applique l'orientation EXIF : une signature photographiée
+/// au téléphone est souvent stockée couchée.
+fn oriented_image(bytes: &[u8], format: ImageFormat) -> Result<DynamicImage, ImageError> {
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_INPUT_DIMENSION);
+    limits.max_image_height = Some(MAX_INPUT_DIMENSION);
+    limits.max_alloc = Some(MAX_DECODE_ALLOCATION_BYTES);
+
+    let mut reader = ImageReader::with_format(Cursor::new(bytes), format);
+    reader.limits(limits.clone());
+    let mut decoder = reader.into_decoder()?;
+    // `into_decoder` ne réserve pas le tampon de sortie, contrairement à `ImageReader::decode`.
+    limits.reserve(decoder.total_bytes())?;
+    let orientation = decoder.orientation()?;
+    let mut image = DynamicImage::from_decoder(decoder)?;
+    image.apply_orientation(orientation);
+    Ok(image)
 }
