@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Chargement de l'image de signature et marquage anti-copie propre à chaque quittance"
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+license = "MIT AND Bitstream-Vera"
 repository.workspace = true
 
 [lints]
