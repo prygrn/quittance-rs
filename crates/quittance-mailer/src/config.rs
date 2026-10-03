@@ -146,7 +146,7 @@ impl fmt::Debug for SmtpConfig {
 mod tests {
     use super::*;
 
-    const PASSWORD: &str = "s3cr3t-value";
+    const PASSWORD: &str = "placeholder-for-tests";
 
     fn complete_variables() -> HashMap<String, String> {
         HashMap::from([
@@ -247,11 +247,11 @@ mod tests {
 
     #[test]
     fn given_password_surrounded_by_spaces_when_loading_config_then_it_is_kept_as_is() {
-        let variables = variables_with(variable_names::PASSWORD, " s3cr3t value\t");
+        let variables = variables_with(variable_names::PASSWORD, " value with spaces\t");
 
         let config = SmtpConfig::from_variables(&variables).unwrap();
 
-        assert_eq!(config.credentials.unwrap().password, " s3cr3t value\t");
+        assert_eq!(config.credentials.unwrap().password, " value with spaces\t");
     }
 
     #[test]
