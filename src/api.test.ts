@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { ReceiptInput, TemplateInfo } from "./api";
+import type { CommandErrorCode, ReceiptInput, TemplateInfo } from "./api";
 
 describe("api types", () => {
   it("mirrors the backend receipt input with ISO dates and integer cents", () => {
@@ -27,5 +27,14 @@ describe("api types", () => {
 
     // Act & Assert
     expectTypeOf<TemplateInfo>().toEqualTypeOf<ExpectedTemplateInfo>();
+  });
+
+  it("lists the error codes the Tauri commands may return", () => {
+    // Arrange
+    type ExpectedCommandErrorCode =
+      "validation" | "template" | "signature" | "pdf" | "mail" | "config" | "unknown";
+
+    // Act & Assert
+    expectTypeOf<CommandErrorCode>().toEqualTypeOf<ExpectedCommandErrorCode>();
   });
 });

@@ -15,8 +15,8 @@ const ALL_FIELDS: ReceiptFormField[] = [
   "propertyAddress",
   "periodStart",
   "periodEnd",
-  "rentCents",
-  "chargesCents",
+  "rentAmount",
+  "chargesAmount",
   "paymentDate",
 ];
 
@@ -47,8 +47,8 @@ describe("validateReceiptForm", () => {
       propertyAddress: " 12 rue des Lilas, 75011 Paris ",
       periodStart: " 2026-10-01 ",
       periodEnd: "2026-10-31\n",
-      rentCents: " 650 ",
-      chargesCents: " 50,50",
+      rentAmount: " 650 ",
+      chargesAmount: " 50,50",
       paymentDate: "\t2026-10-05",
     });
 
@@ -140,14 +140,14 @@ describe("validateReceiptForm", () => {
   });
 
   it.each<[ReceiptFormField, string, FieldErrorCode]>([
-    ["rentCents", "abc", "invalidAmount"],
-    ["rentCents", "-650", "negativeAmount"],
-    ["rentCents", "650,505", "tooManyDecimals"],
-    ["rentCents", "90071992547409,92", "amountTooLarge"],
-    ["chargesCents", "1.234,56", "invalidAmount"],
-    ["chargesCents", "-5", "negativeAmount"],
-    ["chargesCents", "0,001", "tooManyDecimals"],
-    ["chargesCents", "100000000000000000", "amountTooLarge"],
+    ["rentAmount", "abc", "invalidAmount"],
+    ["rentAmount", "-650", "negativeAmount"],
+    ["rentAmount", "650,505", "tooManyDecimals"],
+    ["rentAmount", "90071992547409,92", "amountTooLarge"],
+    ["chargesAmount", "1.234,56", "invalidAmount"],
+    ["chargesAmount", "-5", "negativeAmount"],
+    ["chargesAmount", "0,001", "tooManyDecimals"],
+    ["chargesAmount", "100000000000000000", "amountTooLarge"],
   ])("reports %s %j as %s", (field, rawAmount, expectedError) => {
     // Arrange
     const values = formValuesWith({ [field]: rawAmount });
@@ -165,7 +165,7 @@ describe("validateReceiptForm", () => {
       tenantName: "",
       tenantEmail: "jeanne",
       periodEnd: "2026-09-30",
-      rentCents: "-1",
+      rentAmount: "-1",
       paymentDate: "05/10/2026",
     });
 
@@ -179,7 +179,7 @@ describe("validateReceiptForm", () => {
         tenantName: "missing",
         tenantEmail: "invalidEmail",
         periodEnd: "invertedPeriod",
-        rentCents: "negativeAmount",
+        rentAmount: "negativeAmount",
         paymentDate: "invalidDate",
       },
     });

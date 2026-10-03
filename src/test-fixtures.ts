@@ -11,8 +11,8 @@ export function sampleReceiptFormValues(): ReceiptFormValues {
     propertyAddress: "12 rue des Lilas, 75011 Paris",
     periodStart: "2026-10-01",
     periodEnd: "2026-10-31",
-    rentCents: "650",
-    chargesCents: "50,50",
+    rentAmount: "650",
+    chargesAmount: "50,50",
     paymentDate: "2026-10-05",
   };
 }
