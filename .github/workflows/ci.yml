@@ -43,6 +43,21 @@ jobs:
       - run: make build-debug
       - run: make test-unit
 
+  msrv:
+    needs: quality
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - id: msrv
+        run: echo "version=$(make -s msrv-version)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+      - run: make msrv-check
+
   release-integration:
     needs: unit
     runs-on: ubuntu-24.04
