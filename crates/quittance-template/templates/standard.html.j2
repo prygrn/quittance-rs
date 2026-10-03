@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Quittance de loyer du {{ period_start }} au {{ period_end }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    background: #ffffff;
+  }
+  body {
+    margin: 0 auto;
+    max-width: 170mm;
+    color: #1a1a1a;
+    background: #ffffff;
+    font-family: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", "DejaVu Sans", sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+  h1 {
+    margin: 0;
+    font-size: 20pt;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .subtitle {
+    margin: 2mm 0 0;
+    color: #555555;
+    font-size: 11pt;
+  }
+  header {
+    padding-bottom: 5mm;
+    border-bottom: 0.6pt solid #1a1a1a;
+  }
+  .parties {
+    display: flex;
+    gap: 10mm;
+    margin-top: 8mm;
+  }
+  .party {
+    flex: 1;
+  }
+  h2 {
+    margin: 0 0 1.5mm;
+    color: #555555;
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .party p,
+  .property p,
+  .signature p {
+    margin: 0;
+  }
+  .name {
+    font-weight: 600;
+  }
+  .address {
+    white-space: pre-line;
+  }
+  .property {
+    margin-top: 7mm;
+  }
+  table {
+    width: 100%;
+    margin-top: 8mm;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    padding: 2mm 0;
+    border-bottom: 0.4pt solid #c8c8c8;
+    text-align: left;
+    font-weight: normal;
+  }
+  td.amount {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  tr.total th,
+  tr.total td {
+    border-top: 0.6pt solid #1a1a1a;
+    border-bottom: none;
+    font-weight: 600;
+  }
+  .in-words {
+    margin: 2mm 0 0;
+    color: #555555;
+    font-style: italic;
+  }
+  .payment {
+    margin: 6mm 0 0;
+  }
+  .statement {
+    margin: 8mm 0 0;
+    text-align: justify;
+  }
+  .signature {
+    width: 70mm;
+    margin: 10mm 0 0 auto;
+  }
+  .signature-area {
+    display: flex;
+    align-items: center;
+    height: 28mm;
+  }
+  .signature-area img {
+    max-width: 60mm;
+    max-height: 26mm;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Quittance de loyer</h1>
+  <p class="subtitle">Période du {{ period_start }} au {{ period_end }}</p>
+</header>
+
+<section class="parties">
+  <div class="party">
+    <h2>Bailleur</h2>
+    <p class="name">{{ landlord_name }}</p>
+    <p class="address">{{ landlord_address }}</p>
+  </div>
+  <div class="party">
+    <h2>Locataire</h2>
+    <p class="name">{{ tenant_name }}</p>
+    <p class="address">{{ tenant_address }}</p>
+    <p>{{ tenant_email }}</p>
+  </div>
+</section>
+
+<section class="property">
+  <h2>Logement loué</h2>
+  <p class="address">{{ property_address }}</p>
+</section>
+
+<table>
+  <tbody>
+    <tr>
+      <th scope="row">Loyer</th>
+      <td class="amount">{{ rent }}</td>
+    </tr>
+    <tr>
+      <th scope="row">Charges</th>
+      <td class="amount">{{ charges }}</td>
+    </tr>
+    <tr class="total">
+      <th scope="row">Total</th>
+      <td class="amount">{{ total }}</td>
+    </tr>
+  </tbody>
+</table>
+<p class="in-words">Soit {{ total_in_words }}.</p>
+
+<p class="payment">Paiement reçu le {{ payment_date }}.</p>
+
+<p class="statement">
+  {{ landlord_name }}, bailleur, déclare avoir reçu de {{ tenant_name }}, locataire, la somme de
+  {{ total }} ({{ total_in_words }}) au titre du loyer et des charges pour la période du
+  {{ period_start }} au {{ period_end }}, pour le logement situé {{ property_address }},
+  et lui en donne quittance, sous réserve de tous ses droits.
+</p>
+
+<section class="signature">
+  <h2>Le bailleur</h2>
+  <p class="name">{{ landlord_name }}</p>
+  <div class="signature-area">
+    {%- if signature_data_uri %}
+    <img src="{{ signature_data_uri }}" alt="Signature du bailleur">
+    {%- endif %}
+  </div>
+</section>
+</body>
+</html>
