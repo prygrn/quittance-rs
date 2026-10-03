@@ -31,17 +31,15 @@ fn mailpit_mailer() -> SmtpMailer {
     let variables = HashMap::from([
         ("SMTP_HOST".to_owned(), MAILPIT_HOST.to_owned()),
         ("SMTP_PORT".to_owned(), MAILPIT_SMTP_PORT.to_owned()),
-        ("SMTP_USERNAME".to_owned(), "mailpit-user".to_owned()),
-        ("SMTP_PASSWORD".to_owned(), "mailpit-password".to_owned()),
         ("SMTP_SECURITY".to_owned(), "none".to_owned()),
     ]);
     let config = SmtpConfig::from_variables(&variables).unwrap();
     SmtpMailer::new(&config).unwrap()
 }
 
-/// Envoie une quittance d'octobre 2026 au locataire donné et renvoie le JSON
-/// du message tel que Mailpit l'a reçu.
-fn send_october_receipt_and_fetch_message(tenant_email: &str) -> String {
+/// Envoie une quittance d'octobre 2026 au locataire donné et renvoie
+/// l'identifiant Mailpit du message reçu.
+fn send_october_receipt(tenant_email: &str) -> String {
     let landlord = Party::new(LANDLORD_NAME, "3 avenue Foch, 69006 Lyon", LANDLORD_EMAIL).unwrap();
     let input = ReceiptInput {
         tenant_name: "Jeanne Martin".to_owned(),
@@ -59,14 +57,19 @@ fn send_october_receipt_and_fetch_message(tenant_email: &str) -> String {
 
     mailpit_mailer().send(&email).unwrap();
 
-    let search_results = get_mailpit_json(&format!("/api/v1/search?query=to:{tenant_email}"));
-    let message_id = string_field(&search_results, "ID");
-    get_mailpit_json(&format!("/api/v1/message/{message_id}"))
+    let search_results = get_mailpit_resource(&format!("/api/v1/search?query=to:{tenant_email}"));
+    string_field(&search_results, "ID").to_owned()
+}
+
+/// Résumé JSON du message tel que Mailpit l'a reçu.
+fn send_october_receipt_and_fetch_message(tenant_email: &str) -> String {
+    let message_id = send_october_receipt(tenant_email);
+    get_mailpit_resource(&format!("/api/v1/message/{message_id}"))
 }
 
 /// Requête HTTP/1.0 minimale : la réponse n'est jamais découpée en chunks
 /// et la connexion se ferme en fin de corps.
-fn get_mailpit_json(path: &str) -> String {
+fn get_mailpit_resource(path: &str) -> String {
     let mut stream = TcpStream::connect(MAILPIT_API_ADDRESS).unwrap();
     let request = format!("GET {path} HTTP/1.0\r\nHost: {MAILPIT_API_ADDRESS}\r\n\r\n");
     stream.write_all(request.as_bytes()).unwrap();
@@ -158,4 +161,21 @@ fn given_receipt_email_when_sending_through_smtp_then_pdf_is_attached() {
     );
     assert_eq!(string_field(attachments, "ContentType"), "application/pdf");
     assert!(attachments.contains(&format!("\"Size\":{}", PDF_CONTENT.len())));
+}
+
+#[test]
+fn given_receipt_email_when_sending_through_smtp_then_hello_name_is_neutral() {
+    let tenant_email = unique_tenant_email("hello-name");
+
+    let message_id = send_october_receipt(&tenant_email);
+
+    let raw_message = get_mailpit_resource(&format!("/api/v1/message/{message_id}/raw"));
+    let received_header = raw_message
+        .lines()
+        .find(|line| line.starts_with("Received: "))
+        .unwrap();
+    assert!(
+        received_header.starts_with("Received: from [127.0.0.1] "),
+        "unexpected {received_header}"
+    );
 }

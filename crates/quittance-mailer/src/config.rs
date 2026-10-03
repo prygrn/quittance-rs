@@ -24,13 +24,19 @@ pub(crate) enum SmtpSecurity {
     Unencrypted,
 }
 
+/// Identifiants d'authentification SMTP.
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct SmtpCredentials {
+    pub(crate) username: String,
+    pub(crate) password: String,
+}
+
 /// Configuration SMTP validée au chargement.
 #[derive(Clone, PartialEq, Eq)]
 pub struct SmtpConfig {
     pub(crate) host: String,
     pub(crate) port: u16,
-    pub(crate) username: String,
-    pub(crate) password: String,
+    pub(crate) credentials: Option<SmtpCredentials>,
     pub(crate) security: SmtpSecurity,
 }
 
@@ -46,8 +52,10 @@ impl SmtpConfig {
         Ok(Self {
             host: host.to_owned(),
             port,
-            username: username.to_owned(),
-            password: password.to_owned(),
+            credentials: Some(SmtpCredentials {
+                username: username.to_owned(),
+                password: password.to_owned(),
+            }),
             security,
         })
     }
@@ -92,7 +100,13 @@ impl fmt::Debug for SmtpConfig {
             .debug_struct("SmtpConfig")
             .field("host", &self.host)
             .field("port", &self.port)
-            .field("username", &self.username)
+            .field(
+                "username",
+                &self
+                    .credentials
+                    .as_ref()
+                    .map(|credentials| &credentials.username),
+            )
             .field("password", &"<redacted>")
             .field("security", &self.security)
             .finish()
@@ -140,8 +154,9 @@ mod tests {
 
         assert_eq!(config.host, "smtp.example.fr");
         assert_eq!(config.port, 587);
-        assert_eq!(config.username, "paul.durand@example.fr");
-        assert_eq!(config.password, PASSWORD);
+        let credentials = config.credentials.unwrap();
+        assert_eq!(credentials.username, "paul.durand@example.fr");
+        assert_eq!(credentials.password, PASSWORD);
     }
 
     #[test]
@@ -171,7 +186,8 @@ mod tests {
         ];
 
         for (value, expected_security) in security_modes {
-            let variables = variables_with(variable_names::SECURITY, value);
+            let mut variables = variables_with(variable_names::SECURITY, value);
+            variables.insert(variable_names::HOST.to_owned(), "localhost".to_owned());
 
             let config = SmtpConfig::from_variables(&variables).unwrap();
 
@@ -184,12 +200,113 @@ mod tests {
         let mut variables = variables_with(variable_names::HOST, " smtp.example.fr\t");
         variables.insert(variable_names::PORT.to_owned(), " 465 ".to_owned());
         variables.insert(variable_names::SECURITY.to_owned(), " tls\n".to_owned());
+        variables.insert(
+            variable_names::USERNAME.to_owned(),
+            " paul.durand@example.fr ".to_owned(),
+        );
 
         let config = SmtpConfig::from_variables(&variables).unwrap();
 
         assert_eq!(config.host, "smtp.example.fr");
         assert_eq!(config.port, 465);
         assert_eq!(config.security, SmtpSecurity::ImplicitTls);
+        assert_eq!(
+            config.credentials.unwrap().username,
+            "paul.durand@example.fr"
+        );
+    }
+
+    #[test]
+    fn given_password_surrounded_by_spaces_when_loading_config_then_it_is_kept_as_is() {
+        let variables = variables_with(variable_names::PASSWORD, " s3cr3t value\t");
+
+        let config = SmtpConfig::from_variables(&variables).unwrap();
+
+        assert_eq!(config.credentials.unwrap().password, " s3cr3t value\t");
+    }
+
+    #[test]
+    fn given_empty_password_when_loading_config_then_it_is_missing() {
+        let variables = variables_with(variable_names::PASSWORD, "");
+
+        let result = SmtpConfig::from_variables(&variables);
+
+        assert!(matches!(
+            result,
+            Err(MailError::MissingVariable(variable_names::PASSWORD))
+        ));
+    }
+
+    #[test]
+    fn given_tls_mode_without_each_credential_when_loading_config_then_it_is_missing() {
+        for credential_variable in [variable_names::USERNAME, variable_names::PASSWORD] {
+            let mut variables = variables_without(credential_variable);
+            variables.insert(variable_names::SECURITY.to_owned(), "tls".to_owned());
+
+            let result = SmtpConfig::from_variables(&variables);
+
+            assert!(
+                matches!(result, Err(MailError::MissingVariable(name)) if name == credential_variable),
+                "{credential_variable} should be missing, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn given_unencrypted_mode_towards_each_loopback_host_when_loading_config_then_it_is_accepted() {
+        for loopback_host in ["localhost", "127.0.0.1", "::1"] {
+            let mut variables = variables_with(variable_names::SECURITY, "none");
+            variables.insert(variable_names::HOST.to_owned(), loopback_host.to_owned());
+
+            let result = SmtpConfig::from_variables(&variables);
+
+            assert!(
+                result.is_ok(),
+                "{loopback_host} should be accepted, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn given_unencrypted_mode_towards_remote_hosts_when_loading_config_then_each_is_rejected() {
+        for remote_host in [
+            "smtp.example.fr",
+            "192.168.1.10",
+            "127.0.0.2",
+            "localhost.example.fr",
+        ] {
+            let mut variables = variables_with(variable_names::SECURITY, "none");
+            variables.insert(variable_names::HOST.to_owned(), remote_host.to_owned());
+
+            let result = SmtpConfig::from_variables(&variables);
+
+            assert!(
+                matches!(result, Err(MailError::UnencryptedRemoteHost(_))),
+                "{remote_host} should be rejected, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn given_unencrypted_mode_without_credentials_when_loading_config_then_it_is_accepted() {
+        let mut variables = variables_without(variable_names::USERNAME);
+        variables.remove(variable_names::PASSWORD);
+        variables.insert(variable_names::HOST.to_owned(), "localhost".to_owned());
+        variables.insert(variable_names::SECURITY.to_owned(), "none".to_owned());
+
+        let config = SmtpConfig::from_variables(&variables).unwrap();
+
+        assert!(config.credentials.is_none());
+    }
+
+    #[test]
+    fn given_unencrypted_mode_with_credentials_when_loading_config_then_they_are_not_kept() {
+        let mut variables = variables_with(variable_names::SECURITY, "none");
+        variables.insert(variable_names::HOST.to_owned(), "localhost".to_owned());
+
+        let config = SmtpConfig::from_variables(&variables).unwrap();
+
+        assert!(config.credentials.is_none());
     }
 
     #[test]

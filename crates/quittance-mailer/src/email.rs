@@ -287,6 +287,28 @@ mod tests {
     }
 
     #[test]
+    fn given_receipt_email_when_debug_formatting_then_pdf_bytes_are_hidden() {
+        let email = build_october_email();
+        let pdf_bytes = format!("{PDF_CONTENT:?}");
+
+        let debug_output = format!("{email:?}");
+
+        assert!(!debug_output.contains(&pdf_bytes));
+        assert!(debug_output.contains("quittance-2026-10.pdf"));
+    }
+
+    #[test]
+    fn given_pdf_attachment_when_debug_formatting_then_only_file_name_is_shown() {
+        let email = build_october_email();
+        let pdf_bytes = format!("{PDF_CONTENT:?}");
+
+        let debug_output = format!("{:?}", email.attachment());
+
+        assert!(!debug_output.contains(&pdf_bytes));
+        assert!(debug_output.contains("quittance-2026-10.pdf"));
+    }
+
+    #[test]
     fn given_empty_pdf_when_building_email_then_attachment_is_rejected() {
         let receipt = sample_october_receipt();
 

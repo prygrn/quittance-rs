@@ -22,17 +22,16 @@ impl SmtpMailer {
         }
         .map_err(|err| MailError::TransportSetup(Box::new(err)))?;
         let builder = builder.port(config.port);
-        // Les identifiants ne circulent jamais en clair : sans chiffrement,
-        // seul le SMTP local de test est visé, et il n'exige pas d'authentification.
-        let transport = match config.security {
-            SmtpSecurity::StartTls | SmtpSecurity::ImplicitTls => builder
-                .credentials(Credentials::new(
-                    config.username.clone(),
-                    config.password.clone(),
-                ))
-                .build(),
-            SmtpSecurity::Unencrypted => builder.build(),
-        };
+        // La configuration ne fournit des identifiants qu'avec chiffrement :
+        // ils ne circulent jamais en clair.
+        let transport = match &config.credentials {
+            Some(credentials) => builder.credentials(Credentials::new(
+                credentials.username.clone(),
+                credentials.password.clone(),
+            )),
+            None => builder,
+        }
+        .build();
         Ok(Self { transport })
     }
 }
@@ -116,10 +115,7 @@ mod tests {
 
     fn config_with_security(security: &str) -> SmtpConfig {
         let variables = HashMap::from([
-            (
-                variable_names::HOST.to_owned(),
-                "smtp.example.fr".to_owned(),
-            ),
+            (variable_names::HOST.to_owned(), "localhost".to_owned()),
             (variable_names::PORT.to_owned(), "587".to_owned()),
             (
                 variable_names::USERNAME.to_owned(),

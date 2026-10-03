@@ -15,6 +15,8 @@ pub enum MailError {
     InvalidPort(String),
     #[error("SMTP security mode `{0}` is unknown, expected starttls, tls or none")]
     UnknownSecurityMode(String),
+    #[error("SMTP security mode none is only allowed towards a loopback host, not `{0}`")]
+    UnencryptedRemoteHost(String),
     #[error("receipt PDF is empty")]
     EmptyAttachment,
     #[error("SMTP transport could not be set up: {0}")]
