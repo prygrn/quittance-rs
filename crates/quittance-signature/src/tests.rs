@@ -7,26 +7,31 @@ use quittance_core::Receipt;
 
 use crate::mention::receipt_mention;
 use crate::test_support::{
-    INK, TemporaryFile, WHITE, count_pixels_differing_from, date, decoded_output, encoded_jpeg,
-    encoded_jpeg_with_exif_orientation, encoded_png, loaded_signature, luminance, opaque_ink_image,
-    receipt_for, sample_receipt, stroke_on_transparent_background, temporary_path, uniform_image,
+    InkMask, TemporaryFile, WHITE, chroma, count_pixels_differing_from, cursive_signature, date,
+    decoded_output, encoded_jpeg, encoded_jpeg_with_exif_orientation, encoded_png,
+    loaded_signature, luminance, opaque_ink_image, receipt_for, sample_receipt,
+    stroke_on_transparent_background, temporary_path, uniform_image,
 };
 use crate::{
     MAX_DECODE_ALLOCATION_BYTES, MAX_FILE_SIZE_BYTES, MAX_INPUT_DIMENSION, MAX_OUTPUT_HEIGHT,
     MAX_OUTPUT_WIDTH, ProtectedSignature, SignatureError, SignatureImage, load_signature,
 };
 
-const EXPECTED_MAX_FILE_SIZE_BYTES: u64 = 5 * 1024 * 1024;
+const EXPECTED_MAX_FILE_SIZE_BYTES: u64 = 3 * 1024 * 1024;
 const EXPECTED_MAX_OUTPUT_WIDTH: u32 = 400;
 const EXPECTED_MAX_OUTPUT_HEIGHT: u32 = 200;
-const EXPECTED_MAX_INPUT_DIMENSION: u32 = 8000;
-const EXPECTED_MAX_DECODE_ALLOCATION_BYTES: u64 = 64 * 1024 * 1024;
+const EXPECTED_MAX_INPUT_DIMENSION: u32 = 600;
+const EXPECTED_MAX_DECODE_ALLOCATION_BYTES: u64 = 8 * 1024 * 1024;
 const EXPECTED_DATA_URI_PREFIX: &str = "data:image/png;base64,";
 const PNG_SIGNATURE_BYTES: [u8; 8] = [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1A, b'\n'];
 const JPEG_START_BYTES: [u8; 3] = [0xFF, 0xD8, 0xFF];
 const WHITE_RGB: Rgb<u8> = Rgb([255, 255, 255]);
 /// Seuil d'un réglage de niveaux qui isolerait l'encre : sous ce seuil, le pixel est de l'encre.
-const INK_LUMINANCE_THRESHOLD: f32 = 128.0;
+const ATTACK_LUMINANCE_THRESHOLD: f32 = 128.0;
+/// Seuil d'un filtre de couleur qui isolerait l'encre bleue d'une mention grise.
+const ATTACK_CHROMA_THRESHOLD: u8 = 25;
+/// Part minimale des pixels d'encre qu'une attaque doit détruire (décision du user).
+const MINIMUM_DESTROYED_INK_RATIO: f64 = 0.30;
 /// Côté des carreaux qui doivent tous porter une partie de la mention.
 const COVERAGE_TILE_SIZE: u32 = 20;
 /// Orientation EXIF 6 : l'image stockée doit être tournée de 90° dans le sens horaire.
@@ -37,6 +42,16 @@ type Protection = fn(&SignatureImage, &Receipt) -> ProtectedSignature;
 type DataUri = fn(&ProtectedSignature) -> &str;
 
 fn assert_is_std_error<E: std::error::Error>() {}
+
+fn assert_minimum_ink_destroyed(attacked: &InkMask, signature: &image::RgbaImage) {
+    let reference = InkMask::from_rgba(signature, |pixel| pixel[3] > 0);
+    let destroyed_ratio = attacked.destroyed_ratio_of(&reference);
+    assert!(
+        destroyed_ratio >= MINIMUM_DESTROYED_INK_RATIO,
+        "only {:.1} % of the ink is destroyed",
+        destroyed_ratio * 100.0
+    );
+}
 
 fn protected_output(name: &str, signature: &image::RgbaImage) -> RgbImage {
     let protected = loaded_signature(name, signature).protect_for_receipt(&sample_receipt());
@@ -213,6 +228,53 @@ fn given_png_taller_than_input_limit_when_loading_then_image_is_too_large() {
 }
 
 #[test]
+fn given_png_wider_than_input_limit_when_loading_then_image_is_too_large() {
+    // Arrange
+    let image = uniform_image(MAX_INPUT_DIMENSION + 1, 1, WHITE);
+    let file = TemporaryFile::with_contents("too-wide.png", &encoded_png(&image));
+
+    // Act
+    let result = load_signature(file.path());
+
+    // Assert
+    assert!(matches!(result, Err(SignatureError::ImageTooLarge { .. })));
+}
+
+#[test]
+fn given_sixteen_bit_png_at_input_limit_when_loading_then_signature_is_loaded() {
+    // Arrange
+    let image = image::ImageBuffer::<image::Rgba<u16>, Vec<u16>>::from_pixel(
+        MAX_INPUT_DIMENSION,
+        MAX_INPUT_DIMENSION,
+        image::Rgba([0, 0, 0, u16::MAX]),
+    );
+    let mut png_bytes = Vec::new();
+    image
+        .write_to(&mut std::io::Cursor::new(&mut png_bytes), ImageFormat::Png)
+        .unwrap();
+    let file = TemporaryFile::with_contents("at-limit.png", &png_bytes);
+
+    // Act
+    let result = load_signature(file.path());
+
+    // Assert
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
+fn given_jpeg_at_input_limit_when_loading_then_signature_is_loaded() {
+    // Arrange
+    let jpeg = encoded_jpeg(&opaque_ink_image(MAX_INPUT_DIMENSION, MAX_INPUT_DIMENSION));
+    let file = TemporaryFile::with_contents("at-limit.jpg", &jpeg);
+
+    // Act
+    let result = load_signature(file.path());
+
+    // Assert
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
 fn given_png_header_followed_by_garbage_when_loading_then_image_is_undecodable() {
     // Arrange
     let mut contents = PNG_SIGNATURE_BYTES.to_vec();
@@ -229,7 +291,7 @@ fn given_png_header_followed_by_garbage_when_loading_then_image_is_undecodable()
 #[test]
 fn given_wide_signature_when_protecting_then_output_width_is_capped_at_maximum() {
     // Arrange
-    let signature = uniform_image(MAX_OUTPUT_WIDTH * 2, 100, WHITE);
+    let signature = uniform_image(MAX_INPUT_DIMENSION, 100, WHITE);
 
     // Act
     let output = protected_output("wide.png", &signature);
@@ -241,7 +303,7 @@ fn given_wide_signature_when_protecting_then_output_width_is_capped_at_maximum()
 #[test]
 fn given_tall_signature_when_protecting_then_output_height_is_capped_at_maximum() {
     // Arrange
-    let signature = uniform_image(100, MAX_OUTPUT_HEIGHT * 5, WHITE);
+    let signature = uniform_image(60, MAX_INPUT_DIMENSION, WHITE);
 
     // Act
     let output = protected_output("tall.png", &signature);
@@ -268,7 +330,7 @@ fn given_jpeg_with_rotated_exif_orientation_when_protecting_then_output_is_uprig
 #[test]
 fn given_wide_signature_when_protecting_then_aspect_ratio_is_preserved() {
     // Arrange
-    let signature = uniform_image(MAX_OUTPUT_WIDTH * 2, 200, WHITE);
+    let signature = uniform_image(MAX_INPUT_DIMENSION, 150, WHITE);
 
     // Act
     let output = protected_output("ratio.png", &signature);
@@ -354,19 +416,47 @@ fn given_blank_signature_when_protecting_then_every_tile_carries_mention() {
 }
 
 #[test]
-fn given_ink_signature_when_thresholding_output_luminance_then_mention_has_cut_the_ink() {
+fn given_ink_signature_when_thresholding_luminance_then_minimum_ink_share_is_destroyed() {
     // Arrange
-    let signature = uniform_image(200, 80, INK);
+    let signature = cursive_signature();
 
     // Act
-    let output = protected_output("ink.png", &signature);
+    let output = protected_output("luminance-attack.png", &signature);
 
     // Assert
-    let cut_ink_pixel_count = output
-        .pixels()
-        .filter(|pixel| luminance(**pixel) >= INK_LUMINANCE_THRESHOLD)
-        .count();
-    assert!(cut_ink_pixel_count > 0);
+    let attacked = InkMask::from_rgb(&output, |pixel| {
+        luminance(pixel) < ATTACK_LUMINANCE_THRESHOLD
+    });
+    assert_minimum_ink_destroyed(&attacked, &signature);
+}
+
+#[test]
+fn given_blue_ink_signature_when_filtering_ink_color_then_minimum_ink_share_is_destroyed() {
+    // Arrange
+    let signature = cursive_signature();
+
+    // Act
+    let output = protected_output("color-attack.png", &signature);
+
+    // Assert
+    let attacked = InkMask::from_rgb(&output, |pixel| chroma(pixel) > ATTACK_CHROMA_THRESHOLD);
+    assert_minimum_ink_destroyed(&attacked, &signature);
+}
+
+#[test]
+fn given_ink_signature_when_thresholding_then_closing_then_minimum_ink_share_is_destroyed() {
+    // Arrange
+    let signature = cursive_signature();
+
+    // Act
+    let output = protected_output("closing-attack.png", &signature);
+
+    // Assert
+    let attacked = InkMask::from_rgb(&output, |pixel| {
+        luminance(pixel) < ATTACK_LUMINANCE_THRESHOLD
+    })
+    .closed();
+    assert_minimum_ink_destroyed(&attacked, &signature);
 }
 
 #[test]
