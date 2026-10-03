@@ -15,17 +15,17 @@ pub use error::SignatureError;
 pub use loading::{SignatureImage, load_signature};
 pub use protection::ProtectedSignature;
 
-/// Taille maximale du fichier de signature : une signature scannée pèse quelques centaines
-/// de kilo-octets, au-delà le fichier n'est vraisemblablement pas une signature.
-pub const MAX_FILE_SIZE_BYTES: u64 = 5 * 1024 * 1024;
+/// Taille maximale du fichier de signature : un PNG RGBA 16 bits de
+/// [`MAX_INPUT_DIMENSION`]² non compressé pèse 2,75 Mio ; la marge couvre les métadonnées.
+pub const MAX_FILE_SIZE_BYTES: u64 = 3 * 1024 * 1024;
 
-/// Côté maximal, en pixels, d'une image acceptée au décodage : une signature, même
-/// photographiée, n'a pas besoin de plus.
-pub const MAX_INPUT_DIMENSION: u32 = 8000;
+/// Côté maximal, en pixels, d'une image source de signature (décision produit) : une
+/// photo de téléphone est refusée, la signature doit être détourée et recadrée.
+pub const MAX_INPUT_DIMENSION: u32 = 600;
 
-/// Mémoire maximale allouée par le décodeur : un petit fichier très compressé ne peut
-/// pas réclamer plusieurs gigaoctets.
-pub const MAX_DECODE_ALLOCATION_BYTES: u64 = 64 * 1024 * 1024;
+/// Mémoire maximale allouée par le décodeur : l'image décodée la plus lourde, RGBA 16 bits
+/// de [`MAX_INPUT_DIMENSION`]², occupe 2,75 Mio ; le reste couvre les tampons du décodeur.
+pub const MAX_DECODE_ALLOCATION_BYTES: u64 = 8 * 1024 * 1024;
 
 /// Hauteur maximale de la signature protégée : environ 2,5 cm à 200 dpi.
 pub const MAX_OUTPUT_HEIGHT: u32 = 200;

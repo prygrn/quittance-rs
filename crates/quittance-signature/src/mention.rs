@@ -32,6 +32,14 @@ mod mention_style {
     /// Teinte que prend l'encre sous la mention : celle de la mention sur fond blanc,
     /// pour que texte et coupures de trait aient la même luminance.
     pub const RESERVE_TONE: f32 = 255.0 + OVERLAY_OPACITY * (OVERLAY_TONE - 255.0);
+    /// Épaississement, en pixels, des glyphes là où ils coupent l'encre : un glyphe de
+    /// 14 px n'a qu'un trait d'environ 1 px, qu'une fermeture morphologique rebouche.
+    pub const CUT_RADIUS: u32 = 1;
+    /// Amplification de la couverture épaissie, pour que les bords des coupures passent
+    /// eux aussi au-dessus d'un seuil d'encre : avec ce réglage, un seuil de luminance, un
+    /// filtre de couleur ou une fermeture 3×3 détruit environ 35 % de l'encre (au moins
+    /// 30 % exigés), sans rendre la signature illisible.
+    pub const CUT_GAIN: f32 = 1.5;
 }
 
 /// Couverture du texte, de 0 (aucun glyphe) à 1 (glyphe plein), sur un calque carré.
@@ -66,6 +74,7 @@ pub(crate) fn stamp_mention(canvas: &mut RgbImage, mention: &str) {
     // recouvre entièrement.
     let side = f64::from(width).hypot(f64::from(height)).ceil() as u32 + 1;
     let layer = mention_layer(mention, side);
+    let cut_layer = dilated(&layer, mention_style::CUT_RADIUS);
 
     let (sine, cosine) = mention_style::ANGLE_DEGREES.to_radians().sin_cos();
     let image_center = (width as f32 / 2.0, height as f32 / 2.0);
@@ -76,9 +85,12 @@ pub(crate) fn stamp_mention(canvas: &mut RgbImage, mention: &str) {
         // Rotation inverse : le point du calque horizontal qui arrive en (x, y).
         let layer_x = offset_x * cosine - offset_y * sine + layer_center;
         let layer_y = offset_x * sine + offset_y * cosine + layer_center;
-        let coverage = bilinear_coverage(&layer, layer_x - 0.5, layer_y - 0.5);
-        if coverage > 0.0 {
-            *pixel = marked_pixel(*pixel, coverage);
+        let (sample_x, sample_y) = (layer_x - 0.5, layer_y - 0.5);
+        let cut_coverage =
+            (bilinear_coverage(&cut_layer, sample_x, sample_y) * mention_style::CUT_GAIN).min(1.0);
+        if cut_coverage > 0.0 {
+            let coverage = bilinear_coverage(&layer, sample_x, sample_y);
+            *pixel = marked_pixel(*pixel, coverage, cut_coverage);
         }
     }
 }
@@ -134,6 +146,26 @@ fn draw_glyph(layer: &mut CoverageLayer, glyph: &OutlinedGlyph, left: i32, basel
     });
 }
 
+/// Maximum de la couverture sur un carré de rayon `radius`, en deux passes séparées.
+fn dilated(layer: &CoverageLayer, radius: u32) -> CoverageLayer {
+    let horizontal = CoverageLayer::from_fn(layer.width(), layer.height(), |x, y| {
+        let first = x.saturating_sub(radius);
+        let last = (x + radius).min(layer.width() - 1);
+        let maximum = (first..=last)
+            .map(|column| layer.get_pixel(column, y).0[0])
+            .fold(0.0, f32::max);
+        Luma([maximum])
+    });
+    CoverageLayer::from_fn(layer.width(), layer.height(), |x, y| {
+        let first = y.saturating_sub(radius);
+        let last = (y + radius).min(layer.height() - 1);
+        let maximum = (first..=last)
+            .map(|row| horizontal.get_pixel(x, row).0[0])
+            .fold(0.0, f32::max);
+        Luma([maximum])
+    })
+}
+
 fn bilinear_coverage(layer: &CoverageLayer, x: f32, y: f32) -> f32 {
     let (left, top) = (x.floor(), y.floor());
     let (horizontal_weight, vertical_weight) = (x - left, y - top);
@@ -153,18 +185,18 @@ fn bilinear_coverage(layer: &CoverageLayer, x: f32, y: f32) -> f32 {
 }
 
 /// Fusion anti-retrait. Sur le fond clair, la mention est un gris foncé semi-transparent.
-/// Sur l'encre, elle fait « réserve » : le trait est éclairci jusqu'à la teinte de la
-/// mention sur fond blanc. Le texte a donc la même luminance partout et coupe les traits
+/// Sur l'encre, elle fait « réserve » à travers des glyphes épaissis (`cut_coverage`) :
+/// le trait est éclairci jusqu'à la teinte de la mention sur fond blanc. Le texte a donc la même luminance partout et coupe les traits
 /// qu'il traverse : un seuil de luminance ou un filtre de couleur retire la mention en
 /// trouant la signature, qu'il faudrait alors reconstruire. Le passage de l'un à l'autre
 /// suit la luminance du pixel, sans seuil.
-fn marked_pixel(pixel: Rgb<u8>, coverage: f32) -> Rgb<u8> {
+fn marked_pixel(pixel: Rgb<u8>, coverage: f32, cut_coverage: f32) -> Rgb<u8> {
     let darkness = 1.0 - luminance(pixel) / 255.0;
     let overlay_weight = mention_style::OVERLAY_OPACITY * coverage;
     Rgb(pixel.0.map(|channel| {
         let channel = f32::from(channel);
         let overlay = channel + overlay_weight * (mention_style::OVERLAY_TONE - channel);
-        let reserve = channel + coverage * (mention_style::RESERVE_TONE - channel);
+        let reserve = channel + cut_coverage * (mention_style::RESERVE_TONE - channel);
         (overlay + darkness * (reserve - overlay))
             .round()
             .clamp(0.0, 255.0) as u8
