@@ -5,14 +5,12 @@ use quittance_core::Receipt;
 use crate::TemplateError;
 use crate::catalog::find_template;
 use crate::french_format::{formatted_date, formatted_money};
-
-/// Seule une image embarquée s'affiche sans réseau, dans l'aperçu comme à l'impression.
-const SIGNATURE_DATA_URI_PREFIX: &str = "data:image/";
+use crate::signature::is_png_data_uri;
 
 /// Rend la quittance avec le template demandé.
 ///
-/// `signature_data_uri` est l'image de signature déjà encodée en data URI ; sans elle,
-/// la zone de signature reste vide.
+/// `signature_data_uri` est l'image de signature déjà encodée en data URI PNG base64 ;
+/// sans elle, la zone de signature reste vide.
 ///
 /// # Errors
 ///
@@ -24,7 +22,7 @@ pub fn render_html(
 ) -> Result<String, TemplateError> {
     let template = find_template(template_id)
         .ok_or_else(|| TemplateError::UnknownTemplate(template_id.to_owned()))?;
-    if signature_data_uri.is_some_and(|uri| !uri.starts_with(SIGNATURE_DATA_URI_PREFIX)) {
+    if signature_data_uri.is_some_and(|uri| !is_png_data_uri(uri)) {
         return Err(TemplateError::InvalidSignature);
     }
     let total_in_words = euro_amount_to_words(receipt.total().cents())?;
@@ -36,10 +34,12 @@ pub fn render_html(
     let landlord = receipt.landlord();
     let tenant = receipt.tenant();
     let html = environment
-        .template_from_str(template.source)?
+        .template_from_str(template.source)
+        .map_err(rendering_failure)?
         .render(context! {
             landlord_name => landlord.name(),
             landlord_address => landlord.address(),
+            landlord_email => landlord.email(),
             tenant_name => tenant.name(),
             tenant_address => tenant.address(),
             tenant_email => tenant.email(),
@@ -52,12 +52,18 @@ pub fn render_html(
             total => generated_text(formatted_money(receipt.total())),
             total_in_words,
             signature_data_uri,
-        })?;
+        })
+        .map_err(rendering_failure)?;
     Ok(html)
 }
 
-/// Texte produit par ce crate à partir de nombres : sans balisage possible, il est inséré
-/// tel quel pour que les `/` des dates restent lisibles dans le HTML.
+/// Chaînes produites par ce crate à partir de nombres et de dates uniquement : sans
+/// balisage possible, elles sont insérées sans échappement. Aucune donnée saisie ne doit
+/// transiter par cette fonction.
 fn generated_text(text: String) -> Value {
     Value::from_safe_string(text)
+}
+
+fn rendering_failure(error: minijinja::Error) -> TemplateError {
+    TemplateError::Rendering(Box::new(error))
 }

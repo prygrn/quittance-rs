@@ -112,6 +112,14 @@
     align-items: center;
     height: 28mm;
   }
+  .legal-notice {
+    margin: 10mm 0 0;
+    padding-top: 3mm;
+    border-top: 0.4pt solid #c8c8c8;
+    color: #555555;
+    font-size: 8pt;
+    text-align: justify;
+  }
   .signature-area img {
     max-width: 60mm;
     max-height: 26mm;
@@ -129,6 +137,7 @@
     <h2>Bailleur</h2>
     <p class="name">{{ landlord_name }}</p>
     <p class="address">{{ landlord_address }}</p>
+    <p>{{ landlord_email }}</p>
   </div>
   <div class="party">
     <h2>Locataire</h2>
@@ -150,7 +159,7 @@
       <td class="amount">{{ rent }}</td>
     </tr>
     <tr>
-      <th scope="row">Charges</th>
+      <th scope="row">Forfait de charges</th>
       <td class="amount">{{ charges }}</td>
     </tr>
     <tr class="total">
@@ -164,9 +173,9 @@
 <p class="payment">Paiement reçu le {{ payment_date }}.</p>
 
 <p class="statement">
-  {{ landlord_name }}, bailleur, déclare avoir reçu de {{ tenant_name }}, locataire, la somme de
+  {{ landlord_name }}, bailleur, déclare avoir reçu de la part de {{ tenant_name }}, locataire, la somme de
   {{ total }} ({{ total_in_words }}) au titre du loyer et des charges pour la période du
-  {{ period_start }} au {{ period_end }}, pour le logement situé {{ property_address }},
+  {{ period_start }} au {{ period_end }}, pour le logement sis {{ property_address }},
   et lui en donne quittance, sous réserve de tous ses droits.
 </p>
 
@@ -179,5 +188,9 @@
     {%- endif %}
   </div>
 </section>
+
+<footer class="legal-notice">
+  En cas de congé précédemment donné, cette quittance représenterait l'indemnité d'occupation et ne saurait être considérée comme un titre de location. Cette quittance annule tous les reçus qui auraient pu être donnés pour acompte versé sur le présent terme, même si ces reçus portent une date postérieure à la date ci-contre. Le paiement de la présente quittance n'emporte pas présomption de paiement des termes antérieurs.
+</footer>
 </body>
 </html>

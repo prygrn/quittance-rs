@@ -8,6 +8,7 @@ mod catalog;
 mod error;
 mod french_format;
 mod render;
+mod signature;
 
 pub use catalog::{TemplateInfo, list_templates};
 pub use error::TemplateError;
