@@ -8,8 +8,16 @@ use thiserror::Error;
 pub enum PdfError {
     #[error("chrome binary not found at `{}`", path.display())]
     ChromeNotFound { path: PathBuf },
-    #[error("failed to launch chrome")]
-    BrowserLaunch(#[source] Box<dyn Error + Send + Sync>),
+    #[error("html is {size} bytes, above the {max} bytes limit")]
+    HtmlTooLarge { size: usize, max: usize },
+    #[error("failed to launch chrome at `{}`", path.display())]
+    BrowserLaunch {
+        path: PathBuf,
+        #[source]
+        source: Box<dyn Error + Send + Sync>,
+    },
+    #[error("failed to open a chrome tab")]
+    TabCreation(#[source] Box<dyn Error + Send + Sync>),
     #[error("failed to render html to pdf")]
     Rendering(#[source] Box<dyn Error + Send + Sync>),
 }

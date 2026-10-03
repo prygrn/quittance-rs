@@ -1,10 +1,24 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use headless_chrome::protocol::cdp::Page;
 use headless_chrome::{Browser, LaunchOptions};
 
 use crate::print_options::build_print_options;
 use crate::{PdfError, PdfRenderer};
+
+/// Bornes d'un rendu, pour qu'il échoue vite au lieu de bloquer.
+struct RenderLimits;
+
+// Temporaire : constantes utilisées par les tests seulement, retiré à la correction.
+#[allow(dead_code)]
+impl RenderLimits {
+    /// Délai maximal d'un appel au navigateur, et d'inactivité avant de le considérer perdu.
+    const RENDER_TIMEOUT: Duration = Duration::from_secs(15);
+    /// Une signature PNG de 600 × 600 px pèse au pire environ 1,4 Mo (RGBA non compressible),
+    /// soit environ 1,9 Mo en base64 : 4 Mio laissent une marge confortable pour le template.
+    const MAX_HTML_BYTES: usize = 4 * 1024 * 1024;
+}
 
 /// Rendu PDF par un Chrome ou Chromium headless lancé à chaque rendu.
 #[derive(Debug, Clone)]
@@ -33,11 +47,9 @@ impl ChromiumPdfRenderer {
 
 impl PdfRenderer for ChromiumPdfRenderer {
     fn render(&self, html: &str) -> Result<Vec<u8>, PdfError> {
-        let browser = Browser::new(self.build_launch_options())
-            .map_err(|err| PdfError::BrowserLaunch(err.into()))?;
-        let tab = browser
-            .new_tab()
-            .map_err(|err| PdfError::BrowserLaunch(err.into()))?;
+        let browser =
+            Browser::new(self.build_launch_options()).map_err(|_err| -> PdfError { todo!() })?;
+        let tab = browser.new_tab().map_err(|_err| -> PdfError { todo!() })?;
         let frame_id = tab
             .call_method(Page::GetFrameTree(None))
             .map_err(|err| PdfError::Rendering(err.into()))?
@@ -122,6 +134,45 @@ mod tests {
 
         let result = renderer.render("<p>Quittance</p>");
 
-        assert!(matches!(result, Err(PdfError::BrowserLaunch(_))));
+        assert!(matches!(
+            result,
+            Err(PdfError::BrowserLaunch { path, .. }) if path == existing_non_executable_file()
+        ));
+    }
+
+    #[test]
+    fn given_renderer_when_building_launch_options_then_idle_timeout_is_render_timeout() {
+        let renderer = ChromiumPdfRenderer::new(existing_non_executable_file()).unwrap();
+
+        let launch_options = renderer.build_launch_options();
+
+        assert_eq!(
+            launch_options.idle_browser_timeout,
+            RenderLimits::RENDER_TIMEOUT
+        );
+    }
+
+    #[test]
+    fn given_html_above_size_limit_when_rendering_then_html_is_too_large() {
+        let renderer = ChromiumPdfRenderer::new(existing_non_executable_file()).unwrap();
+        let oversized_html = "a".repeat(RenderLimits::MAX_HTML_BYTES + 1);
+
+        let result = renderer.render(&oversized_html);
+
+        assert!(matches!(
+            result,
+            Err(PdfError::HtmlTooLarge { size, max })
+                if size == RenderLimits::MAX_HTML_BYTES + 1 && max == RenderLimits::MAX_HTML_BYTES
+        ));
+    }
+
+    #[test]
+    fn given_html_at_size_limit_when_rendering_then_it_is_not_rejected_for_size() {
+        let renderer = ChromiumPdfRenderer::new(existing_non_executable_file()).unwrap();
+        let html_at_limit = "a".repeat(RenderLimits::MAX_HTML_BYTES);
+
+        let result = renderer.render(&html_at_limit);
+
+        assert!(matches!(result, Err(PdfError::BrowserLaunch { .. })));
     }
 }
