@@ -7,6 +7,7 @@ use lettre::transport::smtp::extension::ClientId;
 use lettre::{Address, Message, SmtpTransport, Transport};
 
 use crate::config::SmtpSecurity;
+use crate::message_id::unique_message_id;
 use crate::{EmailContact, MailError, Mailer, ReceiptEmail, SmtpConfig};
 
 /// Nom annoncé à l'EHLO : un littéral d'adresse fixe, pour que le nom de la machine
@@ -59,8 +60,11 @@ fn to_lettre_message(email: &ReceiptEmail) -> Result<Message, MailError> {
     let attachment = email.attachment();
     let content_type = ContentType::parse(attachment.content_type())
         .map_err(|err| MailError::InvalidMessage(Box::new(err)))?;
+    let sender = to_mailbox(email.sender())?;
+    let message_id = unique_message_id(sender.email.domain());
     Message::builder()
-        .from(to_mailbox(email.sender())?)
+        .message_id(Some(message_id))
+        .from(sender)
         .to(to_mailbox(email.recipient())?)
         .bcc(Mailbox::new(None, parse_address(email.blind_copy())?))
         .subject(email.subject())

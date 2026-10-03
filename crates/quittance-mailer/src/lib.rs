@@ -7,6 +7,7 @@ mod config;
 mod email;
 mod error;
 mod mailer;
+mod message_id;
 mod smtp_mailer;
 
 pub use config::SmtpConfig;
