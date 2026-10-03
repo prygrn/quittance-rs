@@ -1,7 +1,8 @@
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use headless_chrome::protocol::cdp::Page;
+use headless_chrome::protocol::cdp::{Emulation, Page};
 use headless_chrome::{Browser, LaunchOptions};
 
 use crate::print_options::build_print_options;
@@ -10,14 +11,22 @@ use crate::{PdfError, PdfRenderer};
 /// Bornes d'un rendu, pour qu'il échoue vite au lieu de bloquer.
 struct RenderLimits;
 
-// Temporaire : constantes utilisées par les tests seulement, retiré à la correction.
-#[allow(dead_code)]
 impl RenderLimits {
     /// Délai maximal d'un appel au navigateur, et d'inactivité avant de le considérer perdu.
     const RENDER_TIMEOUT: Duration = Duration::from_secs(15);
     /// Une signature PNG de 600 × 600 px pèse au pire environ 1,4 Mo (RGBA non compressible),
     /// soit environ 1,9 Mo en base64 : 4 Mio laissent une marge confortable pour le template.
     const MAX_HTML_BYTES: usize = 4 * 1024 * 1024;
+}
+
+/// Arguments de Chrome qui coupent tout accès réseau ; les data URI restent lisibles.
+struct NetworkIsolation;
+
+impl NetworkIsolation {
+    /// Port 9 (discard) en local : aucune requête ne peut aboutir via ce proxy.
+    const UNREACHABLE_PROXY_ARG: &str = "--proxy-server=127.0.0.1:9";
+    /// Sans ce retrait, Chrome contournerait le proxy pour les adresses locales.
+    const NO_LOOPBACK_BYPASS_ARG: &str = "--proxy-bypass-list=<-loopback>";
 }
 
 /// Rendu PDF par un Chrome ou Chromium headless lancé à chaque rendu.
@@ -40,6 +49,11 @@ impl ChromiumPdfRenderer {
         LaunchOptions {
             headless: true,
             path: Some(self.chrome_path.clone()),
+            idle_browser_timeout: RenderLimits::RENDER_TIMEOUT,
+            args: vec![
+                OsStr::new(NetworkIsolation::UNREACHABLE_PROXY_ARG),
+                OsStr::new(NetworkIsolation::NO_LOOPBACK_BYPASS_ARG),
+            ],
             ..LaunchOptions::default()
         }
     }
@@ -47,9 +61,23 @@ impl ChromiumPdfRenderer {
 
 impl PdfRenderer for ChromiumPdfRenderer {
     fn render(&self, html: &str) -> Result<Vec<u8>, PdfError> {
+        if html.len() > RenderLimits::MAX_HTML_BYTES {
+            return Err(PdfError::HtmlTooLarge {
+                size: html.len(),
+                max: RenderLimits::MAX_HTML_BYTES,
+            });
+        }
         let browser =
-            Browser::new(self.build_launch_options()).map_err(|_err| -> PdfError { todo!() })?;
-        let tab = browser.new_tab().map_err(|_err| -> PdfError { todo!() })?;
+            Browser::new(self.build_launch_options()).map_err(|err| PdfError::BrowserLaunch {
+                path: self.chrome_path.clone(),
+                source: err.into(),
+            })?;
+        let tab = browser
+            .new_tab()
+            .map_err(|err| PdfError::TabCreation(err.into()))?;
+        tab.set_default_timeout(RenderLimits::RENDER_TIMEOUT);
+        tab.call_method(Emulation::SetScriptExecutionDisabled { value: true })
+            .map_err(|err| PdfError::Rendering(err.into()))?;
         let frame_id = tab
             .call_method(Page::GetFrameTree(None))
             .map_err(|err| PdfError::Rendering(err.into()))?
