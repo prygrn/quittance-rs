@@ -134,7 +134,7 @@ mod tests {
             ),
             (
                 variable_names::PASSWORD.to_owned(),
-                "s3cr3t-value".to_owned(),
+                "placeholder-for-tests".to_owned(),
             ),
             (variable_names::SECURITY.to_owned(), security.to_owned()),
         ]);
