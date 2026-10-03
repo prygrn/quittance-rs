@@ -1,10 +1,17 @@
+use std::net::Ipv4Addr;
+
 use lettre::message::header::ContentType;
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
+use lettre::transport::smtp::extension::ClientId;
 use lettre::{Address, Message, SmtpTransport, Transport};
 
 use crate::config::SmtpSecurity;
 use crate::{EmailContact, MailError, Mailer, ReceiptEmail, SmtpConfig};
+
+/// Nom annoncé à l'EHLO : un littéral d'adresse fixe, pour que le nom de la machine
+/// du bailleur n'apparaisse jamais dans les en-têtes `Received` du message reçu.
+const NEUTRAL_HELLO_NAME: ClientId = ClientId::Ipv4(Ipv4Addr::LOCALHOST);
 
 /// Envoi réel par SMTP via lettre.
 #[derive(Clone)]
@@ -21,7 +28,7 @@ impl SmtpMailer {
             SmtpSecurity::Unencrypted => Ok(SmtpTransport::builder_dangerous(&config.host)),
         }
         .map_err(|err| MailError::TransportSetup(Box::new(err)))?;
-        let builder = builder.port(config.port);
+        let builder = builder.port(config.port).hello_name(NEUTRAL_HELLO_NAME);
         // La configuration ne fournit des identifiants qu'avec chiffrement :
         // ils ne circulent jamais en clair.
         let transport = match &config.credentials {

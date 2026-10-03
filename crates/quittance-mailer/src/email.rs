@@ -1,3 +1,5 @@
+use std::fmt;
+
 use quittance_core::{Date, Party, Receipt};
 
 use crate::MailError;
@@ -49,10 +51,20 @@ impl EmailContact {
 }
 
 /// Quittance PDF jointe à l'email.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct PdfAttachment {
     file_name: String,
     content: Vec<u8>,
+}
+
+/// Les octets du PDF n'encombrent pas les traces : seul le nom du fichier apparaît.
+impl fmt::Debug for PdfAttachment {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PdfAttachment")
+            .field("file_name", &self.file_name)
+            .finish_non_exhaustive()
+    }
 }
 
 impl PdfAttachment {

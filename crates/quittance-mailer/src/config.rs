@@ -46,19 +46,48 @@ impl SmtpConfig {
     pub fn from_variables(variables: &HashMap<String, String>) -> Result<Self, MailError> {
         let host = required_value(variables, variable_names::HOST)?;
         let port = parse_port(required_value(variables, variable_names::PORT)?)?;
-        let username = required_value(variables, variable_names::USERNAME)?;
-        let password = required_value(variables, variable_names::PASSWORD)?;
         let security = parse_security(optional_value(variables, variable_names::SECURITY))?;
+        let credentials = match security {
+            SmtpSecurity::Unencrypted => {
+                ensure_loopback_host(host)?;
+                // Jamais d'identifiants en clair, même fournis.
+                None
+            }
+            SmtpSecurity::StartTls | SmtpSecurity::ImplicitTls => Some(SmtpCredentials {
+                username: required_value(variables, variable_names::USERNAME)?.to_owned(),
+                password: required_raw_value(variables, variable_names::PASSWORD)?.to_owned(),
+            }),
+        };
         Ok(Self {
             host: host.to_owned(),
             port,
-            credentials: Some(SmtpCredentials {
-                username: username.to_owned(),
-                password: password.to_owned(),
-            }),
+            credentials,
             security,
         })
     }
+}
+
+/// Seuls hôtes acceptés sans chiffrement : le SMTP local de test.
+const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "::1"];
+
+fn ensure_loopback_host(host: &str) -> Result<(), MailError> {
+    if LOOPBACK_HOSTS.contains(&host) {
+        Ok(())
+    } else {
+        Err(MailError::UnencryptedRemoteHost(host.to_owned()))
+    }
+}
+
+/// Valeur non trimée, pour un mot de passe qui peut commencer ou finir par une espace.
+fn required_raw_value<'map>(
+    variables: &'map HashMap<String, String>,
+    name: &'static str,
+) -> Result<&'map str, MailError> {
+    variables
+        .get(name)
+        .map(String::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or(MailError::MissingVariable(name))
 }
 
 /// Valeur trimée, absente si la variable est vide.
