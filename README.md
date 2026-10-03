@@ -53,6 +53,7 @@ make setup        # dépendances npm, hooks git, lien des règles projet
 | `make test-unit`        | Tests unitaires Rust et TS                                      |
 | `make test-integration` | Tests d'intégration (Chromium, Mailpit)                         |
 | `make test-e2e`         | Tests end-to-end de l'app                                       |
+| `make msrv-check`       | Compile avec le `rust-version` du `Cargo.toml` (rustup requis)  |
 | `make ci`               | Toute la chaîne, comme en CI                                    |
 
 ### Workflow test-first

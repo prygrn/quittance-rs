@@ -1,5 +1,5 @@
 # Point d'entrée unique des commandes de développement, partagé par le hook git et la CI.
-.PHONY: setup format fmt-check lint quality build-debug test-unit build-release test-integration test-e2e ci
+.PHONY: setup format fmt-check lint quality build-debug test-unit build-release test-integration test-e2e ci msrv-check
 
 setup:
 	npm ci
@@ -43,5 +43,9 @@ test-integration:
 # Branché en F8 (tauri-driver + WebdriverIO).
 test-e2e:
 	@echo "test-e2e: aucun test e2e pour l'instant"
+
+# Vérifie la compilation avec le rust-version déclaré dans Cargo.toml (requiert rustup).
+msrv-check:
+	cargo +$$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml) check --workspace --all-targets --locked
 
 ci: quality build-debug test-unit build-release test-integration test-e2e
