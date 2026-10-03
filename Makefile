@@ -1,5 +1,5 @@
 # Point d'entrée unique des commandes de développement, partagé par le hook git et la CI.
-.PHONY: setup format fmt-check lint quality build-debug test-unit build-release test-integration test-e2e ci
+.PHONY: setup format fmt-check lint quality build-debug test-unit build-release test-integration test-e2e ci msrv-version msrv-check
 
 setup:
 	npm ci
@@ -34,7 +34,7 @@ build-release:
 
 # cargo échoue sur --test '*' tant qu'aucun dossier tests/ n'existe.
 test-integration:
-	@if ls crates/*/tests/*.rs src-tauri/tests/*.rs >/dev/null 2>&1; then \
+	@if find crates/*/tests src-tauri/tests -maxdepth 1 -name '*.rs' 2>/dev/null | grep -q .; then \
 		cargo test --release --workspace --test '*'; \
 	else \
 		echo "test-integration: aucun test d'intégration pour l'instant"; \
@@ -43,5 +43,16 @@ test-integration:
 # Branché en F8 (tauri-driver + WebdriverIO).
 test-e2e:
 	@echo "test-e2e: aucun test e2e pour l'instant"
+
+# Affiche le rust-version déclaré dans Cargo.toml ; échoue s'il est introuvable.
+msrv-version:
+	@v=$$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml); \
+	if [ -z "$$v" ]; then echo "msrv-version: rust-version introuvable dans Cargo.toml" >&2; exit 1; fi; \
+	echo "$$v"
+
+# Vérifie la compilation avec le rust-version déclaré dans Cargo.toml (requiert rustup).
+msrv-check:
+	@v=$$($(MAKE) -s msrv-version) || exit 1; \
+	cargo +$$v check --workspace --all-targets --locked
 
 ci: quality build-debug test-unit build-release test-integration test-e2e
