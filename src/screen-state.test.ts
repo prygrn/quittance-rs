@@ -12,30 +12,69 @@ import { sampleReceiptInput } from "./test-fixtures";
 const INPUT: ReceiptInput = sampleReceiptInput();
 const OTHER_INPUT: ReceiptInput = { ...sampleReceiptInput(), rentCents: 70_000 };
 const PREVIEW_HTML = "<html><body>Quittance de loyer</body></html>";
+const TEMPLATE_ID = "classic";
+const OTHER_TEMPLATE_ID = "modern";
 const OTHER_PREVIEW_HTML = "<html><body>Autre quittance</body></html>";
 
 const STATES = {
   idle: { status: "idle" },
-  previewPending: { status: "previewing", input: INPUT, previewHtml: null },
-  previewReady: { status: "previewing", input: INPUT, previewHtml: PREVIEW_HTML },
-  sending: { status: "sending", input: INPUT, previewHtml: PREVIEW_HTML },
-  sent: { status: "sent", input: INPUT, previewHtml: PREVIEW_HTML },
+  previewPending: {
+    status: "previewing",
+    input: INPUT,
+    templateId: TEMPLATE_ID,
+    previewHtml: null,
+  },
+  previewReady: {
+    status: "previewing",
+    input: INPUT,
+    templateId: TEMPLATE_ID,
+    previewHtml: PREVIEW_HTML,
+  },
+  sending: { status: "sending", input: INPUT, templateId: TEMPLATE_ID, previewHtml: PREVIEW_HTML },
+  sent: { status: "sent", input: INPUT, templateId: TEMPLATE_ID, previewHtml: PREVIEW_HTML },
   previewError: { status: "error", code: "template", sendRetry: null },
   sendError: {
     status: "error",
     code: "mail",
-    sendRetry: { input: INPUT, previewHtml: PREVIEW_HTML },
+    sendRetry: { input: INPUT, templateId: TEMPLATE_ID, previewHtml: PREVIEW_HTML },
   },
 } satisfies Record<string, ScreenState>;
 
 // Les événements de réponse portent INPUT, la saisie des états ; les variantes
 // « stale » répondent pour une autre saisie.
 const EVENTS = {
-  previewRequested: { type: "previewRequested", input: OTHER_INPUT },
-  previewReceived: { type: "previewReceived", input: INPUT, html: PREVIEW_HTML },
-  stalePreviewReceived: { type: "previewReceived", input: OTHER_INPUT, html: OTHER_PREVIEW_HTML },
-  previewFailed: { type: "previewFailed", input: INPUT, code: "template" },
-  stalePreviewFailed: { type: "previewFailed", input: OTHER_INPUT, code: "template" },
+  previewRequested: { type: "previewRequested", input: OTHER_INPUT, templateId: TEMPLATE_ID },
+  previewReceived: {
+    type: "previewReceived",
+    input: INPUT,
+    templateId: TEMPLATE_ID,
+    html: PREVIEW_HTML,
+  },
+  stalePreviewReceived: {
+    type: "previewReceived",
+    input: OTHER_INPUT,
+    templateId: TEMPLATE_ID,
+    html: OTHER_PREVIEW_HTML,
+  },
+  staleTemplatePreviewReceived: {
+    type: "previewReceived",
+    input: INPUT,
+    templateId: OTHER_TEMPLATE_ID,
+    html: OTHER_PREVIEW_HTML,
+  },
+  staleTemplatePreviewFailed: {
+    type: "previewFailed",
+    input: INPUT,
+    templateId: OTHER_TEMPLATE_ID,
+    code: "template",
+  },
+  previewFailed: { type: "previewFailed", input: INPUT, templateId: TEMPLATE_ID, code: "template" },
+  stalePreviewFailed: {
+    type: "previewFailed",
+    input: OTHER_INPUT,
+    templateId: TEMPLATE_ID,
+    code: "template",
+  },
   sendRequested: { type: "sendRequested" },
   sendSucceeded: { type: "sendSucceeded" },
   sendFailed: { type: "sendFailed", code: "mail" },
@@ -48,6 +87,7 @@ type EventName = keyof typeof EVENTS;
 const PENDING_OTHER_PREVIEW: ScreenState = {
   status: "previewing",
   input: OTHER_INPUT,
+  templateId: TEMPLATE_ID,
   previewHtml: null,
 };
 
@@ -116,7 +156,12 @@ describe("nextScreenState", () => {
 
   it("accepts a preview whose input is a structurally equal copy of the requested one", () => {
     // Arrange
-    const event: ScreenEvent = { type: "previewReceived", input: { ...INPUT }, html: PREVIEW_HTML };
+    const event: ScreenEvent = {
+      type: "previewReceived",
+      input: { ...INPUT },
+      templateId: TEMPLATE_ID,
+      html: PREVIEW_HTML,
+    };
 
     // Act
     const nextState = nextScreenState(STATES.previewPending, event);
@@ -129,9 +174,9 @@ describe("nextScreenState", () => {
     // Arrange
     const events: ScreenEvent[] = [
       { type: "sendRequested" },
-      { type: "previewRequested", input: INPUT },
+      { type: "previewRequested", input: INPUT, templateId: TEMPLATE_ID },
       { type: "sendRequested" },
-      { type: "previewReceived", input: INPUT, html: PREVIEW_HTML },
+      { type: "previewReceived", input: INPUT, templateId: TEMPLATE_ID, html: PREVIEW_HTML },
       { type: "sendRequested" },
     ];
 
@@ -145,9 +190,9 @@ describe("nextScreenState", () => {
   it("ignores the preview of A arriving after the form was edited", () => {
     // Arrange
     const events: ScreenEvent[] = [
-      { type: "previewRequested", input: INPUT },
+      { type: "previewRequested", input: INPUT, templateId: TEMPLATE_ID },
       { type: "formEdited" },
-      { type: "previewReceived", input: INPUT, html: PREVIEW_HTML },
+      { type: "previewReceived", input: INPUT, templateId: TEMPLATE_ID, html: PREVIEW_HTML },
       { type: "sendRequested" },
     ];
 
@@ -161,10 +206,10 @@ describe("nextScreenState", () => {
   it("ignores the preview of A arriving after B was requested and keeps sending impossible", () => {
     // Arrange
     const events: ScreenEvent[] = [
-      { type: "previewRequested", input: INPUT },
+      { type: "previewRequested", input: INPUT, templateId: TEMPLATE_ID },
       { type: "formEdited" },
-      { type: "previewRequested", input: OTHER_INPUT },
-      { type: "previewReceived", input: INPUT, html: PREVIEW_HTML },
+      { type: "previewRequested", input: OTHER_INPUT, templateId: TEMPLATE_ID },
+      { type: "previewReceived", input: INPUT, templateId: TEMPLATE_ID, html: PREVIEW_HTML },
       { type: "sendRequested" },
     ];
 
@@ -175,13 +220,40 @@ describe("nextScreenState", () => {
     expect(finalState).toEqual(PENDING_OTHER_PREVIEW);
   });
 
+  it("ignores the preview of template A arriving after template B was requested", () => {
+    // Arrange
+    const events: ScreenEvent[] = [
+      { type: "previewRequested", input: INPUT, templateId: TEMPLATE_ID },
+      { type: "formEdited" },
+      { type: "previewRequested", input: INPUT, templateId: OTHER_TEMPLATE_ID },
+      { type: "previewReceived", input: INPUT, templateId: TEMPLATE_ID, html: PREVIEW_HTML },
+      { type: "sendRequested" },
+    ];
+
+    // Act
+    const finalState = events.reduce(nextScreenState, INITIAL_SCREEN_STATE);
+
+    // Assert
+    expect(finalState).toEqual({
+      status: "previewing",
+      input: INPUT,
+      templateId: OTHER_TEMPLATE_ID,
+      previewHtml: null,
+    });
+  });
+
   it("sends B once its own preview arrives after the stale preview of A", () => {
     // Arrange
     const events: ScreenEvent[] = [
-      { type: "previewRequested", input: INPUT },
-      { type: "previewRequested", input: OTHER_INPUT },
-      { type: "previewReceived", input: INPUT, html: PREVIEW_HTML },
-      { type: "previewReceived", input: OTHER_INPUT, html: OTHER_PREVIEW_HTML },
+      { type: "previewRequested", input: INPUT, templateId: TEMPLATE_ID },
+      { type: "previewRequested", input: OTHER_INPUT, templateId: TEMPLATE_ID },
+      { type: "previewReceived", input: INPUT, templateId: TEMPLATE_ID, html: PREVIEW_HTML },
+      {
+        type: "previewReceived",
+        input: OTHER_INPUT,
+        templateId: TEMPLATE_ID,
+        html: OTHER_PREVIEW_HTML,
+      },
       { type: "sendRequested" },
     ];
 
@@ -192,6 +264,7 @@ describe("nextScreenState", () => {
     expect(finalState).toEqual({
       status: "sending",
       input: OTHER_INPUT,
+      templateId: TEMPLATE_ID,
       previewHtml: OTHER_PREVIEW_HTML,
     });
   });
