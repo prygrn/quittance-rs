@@ -10,6 +10,8 @@ Générateur de quittances de loyer, pour usage personnel (bailleur particulier)
 - Signature manuscrite protégée contre la copie (voir ci-dessous)
 - Envoi automatique au locataire par email (SMTP)
 
+L'outil ne produit que des quittances, c'est-à-dire des attestations de paiement intégral du loyer et des charges d'une période. Un paiement partiel appelle un simple reçu, hors du périmètre de quittance-rs.
+
 ## Signature protégée contre la copie
 
 Une quittance porte la signature du bailleur et part chez un tiers. Dans un PDF classique, l'image de signature y est incorporée telle quelle : n'importe qui peut l'extraire en un clic, en pleine résolution et avec sa transparence, puis la coller sur un autre document.
