@@ -179,3 +179,15 @@ fn given_receipt_email_when_sending_through_smtp_then_hello_name_is_neutral() {
         "unexpected {received_header}"
     );
 }
+
+#[test]
+fn given_receipt_email_when_sending_through_smtp_then_message_id_uses_landlord_domain() {
+    let tenant_email = unique_tenant_email("message-id");
+
+    let message = send_october_receipt_and_fetch_message(&tenant_email);
+
+    let message_id = string_field(&message, "MessageID");
+    let (left_part, domain) = message_id.split_once('@').unwrap();
+    assert!(!left_part.is_empty());
+    assert_eq!(domain, "example.fr");
+}

@@ -176,4 +176,57 @@ mod tests {
         let formatted = String::from_utf8_lossy(&message.formatted()).to_lowercase();
         assert!(!formatted.contains("bcc:"));
     }
+
+    fn message_id_of(message: &Message) -> String {
+        message
+            .headers()
+            .get_raw("Message-ID")
+            .expect("Message-ID header should be set")
+            .to_owned()
+    }
+
+    #[test]
+    fn given_receipt_email_when_converting_then_message_id_is_well_formed() {
+        let email = sample_email();
+
+        let message = to_lettre_message(&email).unwrap();
+
+        let message_id = message_id_of(&message);
+        let inner = message_id
+            .strip_prefix('<')
+            .and_then(|rest| rest.strip_suffix('>'))
+            .expect("Message-ID should be enclosed in angle brackets");
+        let (left_part, _) = inner.split_once('@').unwrap();
+        assert!(!left_part.is_empty());
+        assert!(
+            left_part.split('.').all(|atom| !atom.is_empty()
+                && atom
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric())),
+            "unexpected left part in {message_id}"
+        );
+    }
+
+    #[test]
+    fn given_receipt_email_when_converting_then_message_id_uses_landlord_domain() {
+        let email = sample_email();
+
+        let message = to_lettre_message(&email).unwrap();
+
+        assert!(message_id_of(&message).ends_with("@example.fr>"));
+    }
+
+    #[test]
+    fn given_two_receipt_emails_when_converting_then_message_ids_differ() {
+        let first_email = sample_email();
+        let second_email = sample_email();
+
+        let first_message = to_lettre_message(&first_email).unwrap();
+        let second_message = to_lettre_message(&second_email).unwrap();
+
+        assert_ne!(
+            message_id_of(&first_message),
+            message_id_of(&second_message)
+        );
+    }
 }
