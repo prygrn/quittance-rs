@@ -7,11 +7,13 @@
 mod catalog;
 mod error;
 mod french_format;
+mod issue;
 mod render;
 mod signature;
 
 pub use catalog::{TemplateInfo, list_templates};
 pub use error::TemplateError;
+pub use issue::IssueDetails;
 pub use render::render_html;
 
 #[cfg(test)]

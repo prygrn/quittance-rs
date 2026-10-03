@@ -2,10 +2,10 @@ use french_amount_words::euro_amount_to_words;
 use minijinja::{AutoEscape, Environment, UndefinedBehavior, Value, context};
 use quittance_core::Receipt;
 
-use crate::TemplateError;
 use crate::catalog::find_template;
 use crate::french_format::{formatted_date, formatted_money};
 use crate::signature::is_png_data_uri;
+use crate::{IssueDetails, TemplateError};
 
 /// Rend la quittance avec le template demandé.
 ///
@@ -15,9 +15,12 @@ use crate::signature::is_png_data_uri;
 /// # Errors
 ///
 /// Voir [`TemplateError`].
+// Temporaire : `issue` reste inutilisé le temps de l'étape test-first.
+#[allow(unused_variables)]
 pub fn render_html(
     template_id: &str,
     receipt: &Receipt,
+    issue: &IssueDetails,
     signature_data_uri: Option<&str>,
 ) -> Result<String, TemplateError> {
     let template = find_template(template_id)

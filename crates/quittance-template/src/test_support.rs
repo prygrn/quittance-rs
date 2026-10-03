@@ -1,5 +1,7 @@
-use quittance_core::{Party, Receipt, ReceiptInput, validate_receipt};
+use quittance_core::{Date, Party, Receipt, ReceiptInput, validate_receipt};
 use time::macros::date;
+
+use crate::IssueDetails;
 
 pub(crate) const LANDLORD_NAME: &str = "Paul Durand";
 pub(crate) const LANDLORD_ADDRESS: &str = "3 avenue Foch, 69006 Lyon";
@@ -10,6 +12,7 @@ pub(crate) const TENANT_EMAIL: &str = "jeanne.martin@example.fr";
 pub(crate) const PROPERTY_ADDRESS: &str = "12 rue des Lilas, 75011 Paris";
 pub(crate) const RENT_CENTS: u64 = 65_000;
 pub(crate) const CHARGES_CENTS: u64 = 5_050;
+pub(crate) const ISSUE_PLACE: &str = "Lyon";
 pub(crate) const STANDARD_TEMPLATE_ID: &str = "standard";
 /// Data URI d'un PNG d'un pixel, comme celui produit par la signature protégée.
 pub(crate) const SIGNATURE_DATA_URI: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGP4DwABAQEAWk1v8QAAAABJRU5ErkJggg==";
@@ -50,6 +53,17 @@ pub(crate) fn receipt_with_amounts(rent_cents: u64, charges_cents: u64) -> Recei
     })
 }
 
+pub(crate) fn issue_on(place: &str, date: Date) -> IssueDetails {
+    IssueDetails {
+        place: place.to_owned(),
+        date,
+    }
+}
+
+pub(crate) fn sample_issue() -> IssueDetails {
+    issue_on(ISSUE_PLACE, date!(2026 - 10 - 06))
+}
+
 pub(crate) fn render_standard(receipt: &Receipt) -> String {
-    crate::render_html(STANDARD_TEMPLATE_ID, receipt, None).unwrap()
+    crate::render_html(STANDARD_TEMPLATE_ID, receipt, &sample_issue(), None).unwrap()
 }

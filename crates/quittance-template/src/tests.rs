@@ -3,15 +3,16 @@ use quittance_core::{Receipt, ReceiptInput};
 use time::macros::date;
 
 use crate::test_support::{
-    CHARGES_CENTS, LANDLORD_ADDRESS, LANDLORD_EMAIL, LANDLORD_NAME, PROPERTY_ADDRESS, RENT_CENTS,
-    SIGNATURE_DATA_URI, STANDARD_TEMPLATE_ID, TENANT_ADDRESS, TENANT_EMAIL, TENANT_NAME,
-    receipt_from, receipt_with_amounts, receipt_with_landlord, render_standard, sample_input,
-    sample_receipt,
+    CHARGES_CENTS, ISSUE_PLACE, LANDLORD_ADDRESS, LANDLORD_EMAIL, LANDLORD_NAME, PROPERTY_ADDRESS,
+    RENT_CENTS, SIGNATURE_DATA_URI, STANDARD_TEMPLATE_ID, TENANT_ADDRESS, TENANT_EMAIL,
+    TENANT_NAME, issue_on, receipt_from, receipt_with_amounts, receipt_with_landlord,
+    render_standard, sample_input, sample_issue, sample_receipt,
 };
-use crate::{TemplateError, TemplateInfo, list_templates, render_html};
+use crate::{IssueDetails, TemplateError, TemplateInfo, list_templates, render_html};
 
 type TemplateListing = fn() -> Vec<TemplateInfo>;
-type HtmlRendering = fn(&str, &Receipt, Option<&str>) -> Result<String, TemplateError>;
+type HtmlRendering =
+    fn(&str, &Receipt, &IssueDetails, Option<&str>) -> Result<String, TemplateError>;
 
 const STANDARD_TEMPLATE_LABEL: &str = "Quittance standard";
 const CENTS_PER_EURO: u64 = 100;
@@ -35,6 +36,7 @@ fn render_with_signature(signature_data_uri: &str) -> Result<String, TemplateErr
     render_html(
         STANDARD_TEMPLATE_ID,
         &sample_receipt(),
+        &sample_issue(),
         Some(signature_data_uri),
     )
 }
@@ -96,7 +98,7 @@ fn given_each_listed_template_when_rendering_then_rendering_succeeds() {
     // Act
     let results: Vec<_> = list_templates()
         .into_iter()
-        .map(|template| render_html(template.id, &receipt, None))
+        .map(|template| render_html(template.id, &receipt, &sample_issue(), None))
         .collect();
 
     // Assert
@@ -220,7 +222,7 @@ fn given_unknown_template_id_when_rendering_then_template_is_unknown() {
     let receipt = sample_receipt();
 
     // Act
-    let result = render_html("inconnu", &receipt, None);
+    let result = render_html("inconnu", &receipt, &sample_issue(), None);
 
     // Assert
     assert!(matches!(result, Err(TemplateError::UnknownTemplate(_))));
@@ -232,7 +234,13 @@ fn given_signature_data_uri_when_rendering_then_signature_image_is_embedded() {
     let receipt = sample_receipt();
 
     // Act
-    let html = render_html(STANDARD_TEMPLATE_ID, &receipt, Some(SIGNATURE_DATA_URI)).unwrap();
+    let html = render_html(
+        STANDARD_TEMPLATE_ID,
+        &receipt,
+        &sample_issue(),
+        Some(SIGNATURE_DATA_URI),
+    )
+    .unwrap();
 
     // Assert
     assert_eq!(html.matches("<img").count(), 1);
@@ -260,6 +268,7 @@ fn given_signature_pointing_to_remote_url_when_rendering_then_signature_is_inval
     let result = render_html(
         STANDARD_TEMPLATE_ID,
         &receipt,
+        &sample_issue(),
         Some("https://example.fr/signature.png"),
     );
 
@@ -352,7 +361,7 @@ fn given_total_beyond_words_limit_when_rendering_then_amount_in_words_fails() {
     let receipt = receipt_with_amounts((MAX_VALUE + 1) * CENTS_PER_EURO, 0);
 
     // Act
-    let result = render_html(STANDARD_TEMPLATE_ID, &receipt, None);
+    let result = render_html(STANDARD_TEMPLATE_ID, &receipt, &sample_issue(), None);
 
     // Assert
     assert!(matches!(result, Err(TemplateError::AmountInWords(_))));
@@ -364,7 +373,13 @@ fn given_signed_receipt_when_rendering_then_html_loads_no_script_nor_external_re
     let receipt = sample_receipt();
 
     // Act
-    let html = render_html(STANDARD_TEMPLATE_ID, &receipt, Some(SIGNATURE_DATA_URI)).unwrap();
+    let html = render_html(
+        STANDARD_TEMPLATE_ID,
+        &receipt,
+        &sample_issue(),
+        Some(SIGNATURE_DATA_URI),
+    )
+    .unwrap();
 
     // Assert
     for forbidden in [
@@ -542,4 +557,44 @@ fn given_padded_png_payloads_when_rendering_then_each_signature_is_accepted() {
 
     // Assert
     assert!(results.iter().all(Result::is_ok), "{results:?}");
+}
+
+#[test]
+fn given_issue_details_when_rendering_then_place_and_date_appear() {
+    // Arrange
+    let receipt = sample_receipt();
+
+    // Act
+    let html = render_standard(&receipt);
+
+    // Assert
+    let expected = format!("Fait à {ISSUE_PLACE}, le 06/10/2026");
+    assert!(html.contains(&expected), "missing `{expected}`");
+}
+
+#[test]
+fn given_markup_in_issue_place_when_rendering_then_it_is_escaped() {
+    // Arrange
+    let receipt = sample_receipt();
+    let issue = issue_on("<b>Lyon</b>", date!(2026 - 10 - 06));
+
+    // Act
+    let html = render_html(STANDARD_TEMPLATE_ID, &receipt, &issue, None).unwrap();
+
+    // Assert
+    assert!(!html.contains("<b>"));
+    assert!(html.contains("Fait à &lt;b&gt;Lyon"));
+}
+
+#[test]
+fn given_single_digit_issue_day_and_month_when_rendering_then_issue_date_is_zero_padded() {
+    // Arrange
+    let receipt = sample_receipt();
+    let issue = issue_on(ISSUE_PLACE, date!(2026 - 03 - 05));
+
+    // Act
+    let html = render_html(STANDARD_TEMPLATE_ID, &receipt, &issue, None).unwrap();
+
+    // Assert
+    assert!(html.contains(", le 05/03/2026"));
 }
