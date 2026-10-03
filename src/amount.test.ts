@@ -14,8 +14,8 @@ describe("parseAmountCents", () => {
     ["007", 700],
     ["  650,50  ", 65_050],
     ["12 345 678,9", 1_234_567_890],
-    ["1 234,56", 123_456],
-    ["1 234,56", 123_456],
+    ["1\u00A0234,56", 123_456],
+    ["1\u202F234,56", 123_456],
     ["90 071 992 547 409,91", Number.MAX_SAFE_INTEGER],
   ])("converts %j to %d cents", (rawAmount: string, expectedCents: number) => {
     // Arrange & Act
