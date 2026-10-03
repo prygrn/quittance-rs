@@ -34,7 +34,7 @@ build-release:
 
 # cargo échoue sur --test '*' tant qu'aucun dossier tests/ n'existe.
 test-integration:
-	@if find crates src-tauri -path '*/tests/*.rs' 2>/dev/null | grep -q .; then \
+	@if find crates/*/tests src-tauri/tests -maxdepth 1 -name '*.rs' 2>/dev/null | grep -q .; then \
 		cargo test --release --workspace --test '*'; \
 	else \
 		echo "test-integration: aucun test d'intégration pour l'instant"; \
