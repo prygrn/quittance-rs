@@ -33,6 +33,11 @@ pub(crate) fn receipt_from(input: ReceiptInput) -> Receipt {
     validate_receipt(landlord, input).unwrap()
 }
 
+pub(crate) fn receipt_with_landlord(name: &str, address: &str) -> Receipt {
+    let landlord = Party::new(name, address, LANDLORD_EMAIL).unwrap();
+    validate_receipt(landlord, sample_input()).unwrap()
+}
+
 pub(crate) fn sample_receipt() -> Receipt {
     receipt_from(sample_input())
 }

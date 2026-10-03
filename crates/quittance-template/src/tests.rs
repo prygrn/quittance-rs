@@ -3,9 +3,10 @@ use quittance_core::{Receipt, ReceiptInput};
 use time::macros::date;
 
 use crate::test_support::{
-    CHARGES_CENTS, LANDLORD_ADDRESS, LANDLORD_NAME, PROPERTY_ADDRESS, RENT_CENTS,
+    CHARGES_CENTS, LANDLORD_ADDRESS, LANDLORD_EMAIL, LANDLORD_NAME, PROPERTY_ADDRESS, RENT_CENTS,
     SIGNATURE_DATA_URI, STANDARD_TEMPLATE_ID, TENANT_ADDRESS, TENANT_EMAIL, TENANT_NAME,
-    receipt_from, receipt_with_amounts, render_standard, sample_input, sample_receipt,
+    receipt_from, receipt_with_amounts, receipt_with_landlord, render_standard, sample_input,
+    sample_receipt,
 };
 use crate::{TemplateError, TemplateInfo, list_templates, render_html};
 
@@ -20,7 +21,32 @@ const FORMATTED_RENT: &str = "650,00\u{a0}€";
 const FORMATTED_CHARGES: &str = "50,50\u{a0}€";
 const FORMATTED_TOTAL: &str = "700,50\u{a0}€";
 
+/// Mention légale de pied de quittance, texte exact décidé par le produit.
+const LEGAL_NOTICE: &str = "En cas de congé précédemment donné, cette quittance représenterait l'indemnité d'occupation et ne saurait être considérée comme un titre de location. Cette quittance annule tous les reçus qui auraient pu être donnés pour acompte versé sur le présent terme, même si ces reçus portent une date postérieure à la date ci-contre. Le paiement de la présente quittance n'emporte pas présomption de paiement des termes antérieurs.";
+/// Tentatives de sortie du contexte texte, y compris depuis le bloc `<style>`.
+const MARKUP_INJECTIONS: [&str; 2] = [
+    "\"><script>alert(1)</script>",
+    "</style><script>alert(1)</script>",
+];
+
 fn assert_is_std_error<ErrorType: std::error::Error + Send + Sync + 'static>() {}
+
+fn render_with_signature(signature_data_uri: &str) -> Result<String, TemplateError> {
+    render_html(
+        STANDARD_TEMPLATE_ID,
+        &sample_receipt(),
+        Some(signature_data_uri),
+    )
+}
+
+fn assert_each_signature_is_invalid(results: &[Result<String, TemplateError>]) {
+    for result in results {
+        assert!(
+            matches!(result, Err(TemplateError::InvalidSignature)),
+            "signature should be rejected, got {result:?}"
+        );
+    }
+}
 
 #[test]
 fn given_crate_when_inspecting_public_api_then_exposes_listing_rendering_and_error() {
@@ -160,8 +186,9 @@ fn given_receipt_when_rendering_standard_then_receipt_formula_appears() {
 
     // Assert
     for expected in [
-        "déclare avoir reçu",
+        "déclare avoir reçu de la part de",
         "au titre du loyer et des charges",
+        "pour le logement sis",
         "en donne quittance, sous réserve de tous ses droits",
     ] {
         assert!(html.contains(expected), "missing `{expected}`");
@@ -364,4 +391,155 @@ fn given_receipt_when_rendering_then_document_is_a_standalone_a4_page() {
     assert!(html.contains("<meta charset=\"utf-8\">"));
     assert!(html.contains("<style>"));
     assert!(html.contains("size: A4"));
+}
+
+#[test]
+fn given_receipt_when_rendering_standard_then_landlord_email_is_visible() {
+    // Arrange
+    let receipt = sample_receipt();
+
+    // Act
+    let html = render_standard(&receipt);
+
+    // Assert
+    assert!(html.contains(LANDLORD_EMAIL));
+}
+
+#[test]
+fn given_receipt_when_rendering_standard_then_charges_are_labelled_as_flat_rate() {
+    // Arrange
+    let receipt = sample_receipt();
+
+    // Act
+    let html = render_standard(&receipt);
+
+    // Assert
+    assert!(html.contains("Forfait de charges"));
+}
+
+#[test]
+fn given_receipt_when_rendering_standard_then_legal_notice_appears() {
+    // Arrange
+    let receipt = sample_receipt();
+
+    // Act
+    let html = render_standard(&receipt);
+
+    // Assert
+    assert!(html.contains(LEGAL_NOTICE));
+}
+
+#[test]
+fn given_markup_in_each_text_field_when_rendering_then_no_script_is_injected() {
+    // Arrange
+    let mut receipts = Vec::new();
+    for injection in MARKUP_INJECTIONS {
+        receipts.push(receipt_with_landlord(injection, LANDLORD_ADDRESS));
+        receipts.push(receipt_with_landlord(LANDLORD_NAME, injection));
+        receipts.push(receipt_from(ReceiptInput {
+            tenant_name: injection.to_owned(),
+            ..sample_input()
+        }));
+        receipts.push(receipt_from(ReceiptInput {
+            tenant_address: injection.to_owned(),
+            ..sample_input()
+        }));
+        receipts.push(receipt_from(ReceiptInput {
+            property_address: injection.to_owned(),
+            ..sample_input()
+        }));
+    }
+
+    // Act
+    let documents: Vec<String> = receipts.iter().map(render_standard).collect();
+
+    // Assert
+    for html in documents {
+        assert!(!html.contains("<script"), "markup leaked into {html}");
+    }
+}
+
+#[test]
+fn given_signature_breaking_out_of_its_attribute_when_rendering_then_signature_is_invalid() {
+    // Arrange
+    let signature_data_uri = "data:image/png;base64,AAAA\" onerror=\"alert(1)";
+
+    // Act
+    let result = render_with_signature(signature_data_uri);
+
+    // Assert
+    assert!(matches!(result, Err(TemplateError::InvalidSignature)));
+}
+
+#[test]
+fn given_svg_signature_when_rendering_then_signature_is_invalid() {
+    // Arrange
+    let signature_data_uri = "data:image/svg+xml,<svg onload=\"alert(1)\"></svg>";
+
+    // Act
+    let result = render_with_signature(signature_data_uri);
+
+    // Assert
+    assert!(matches!(result, Err(TemplateError::InvalidSignature)));
+}
+
+#[test]
+fn given_png_signature_without_payload_when_rendering_then_signature_is_invalid() {
+    // Arrange
+    let signature_data_uri = "data:image/png;base64,";
+
+    // Act
+    let result = render_with_signature(signature_data_uri);
+
+    // Assert
+    assert!(matches!(result, Err(TemplateError::InvalidSignature)));
+}
+
+#[test]
+fn given_png_signature_with_non_base64_payload_when_rendering_then_signature_is_invalid() {
+    // Arrange
+    let malformed_payloads = ["iVBO R0==", "iVBO-_w=", "AAA", "A=AA", "AA===", "éèàç"];
+
+    // Act
+    let results: Vec<_> = malformed_payloads
+        .iter()
+        .map(|payload| render_with_signature(&format!("data:image/png;base64,{payload}")))
+        .collect();
+
+    // Assert
+    assert_each_signature_is_invalid(&results);
+}
+
+#[test]
+fn given_non_image_uris_when_rendering_then_each_signature_is_invalid() {
+    // Arrange
+    let non_image_uris = [
+        "javascript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+        "data:image/jpeg;base64,AAAA",
+    ];
+
+    // Act
+    let results: Vec<_> = non_image_uris
+        .iter()
+        .map(|uri| render_with_signature(uri))
+        .collect();
+
+    // Assert
+    assert_each_signature_is_invalid(&results);
+}
+
+#[test]
+fn given_padded_png_payloads_when_rendering_then_each_signature_is_accepted() {
+    // Arrange
+    let payloads = ["AAAA", "AAA=", "AA==", "ab+/Zz09"];
+
+    // Act
+    let results: Vec<_> = payloads
+        .iter()
+        .map(|payload| render_with_signature(&format!("data:image/png;base64,{payload}")))
+        .collect();
+
+    // Assert
+    assert!(results.iter().all(Result::is_ok), "{results:?}");
 }
