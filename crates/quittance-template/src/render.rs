@@ -9,14 +9,13 @@ use crate::{IssueDetails, TemplateError};
 
 /// Rend la quittance avec le template demandé.
 ///
+/// `issue` porte le lieu et la date de la mention « Fait à …, le … ».
 /// `signature_data_uri` est l'image de signature déjà encodée en data URI PNG base64 ;
 /// sans elle, la zone de signature reste vide.
 ///
 /// # Errors
 ///
 /// Voir [`TemplateError`].
-// Temporaire : `issue` reste inutilisé le temps de l'étape test-first.
-#[allow(unused_variables)]
 pub fn render_html(
     template_id: &str,
     receipt: &Receipt,
@@ -54,6 +53,8 @@ pub fn render_html(
             charges => generated_text(formatted_money(receipt.charges())),
             total => generated_text(formatted_money(receipt.total())),
             total_in_words,
+            issue_place => issue.place.as_str(),
+            issue_date => generated_text(formatted_date(issue.date)),
             signature_data_uri,
         })
         .map_err(rendering_failure)?;

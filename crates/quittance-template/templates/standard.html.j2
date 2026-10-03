@@ -103,9 +103,13 @@
     margin: 8mm 0 0;
     text-align: justify;
   }
-  .signature {
+  .issue {
     width: 70mm;
     margin: 10mm 0 0 auto;
+  }
+  .signature {
+    width: 70mm;
+    margin: 4mm 0 0 auto;
   }
   .signature-area {
     display: flex;
@@ -178,6 +182,8 @@
   {{ period_start }} au {{ period_end }}, pour le logement sis {{ property_address }},
   et lui en donne quittance, sous réserve de tous ses droits.
 </p>
+
+<p class="issue">Fait à {{ issue_place }}, le {{ issue_date }}</p>
 
 <section class="signature">
   <h2>Le bailleur</h2>
