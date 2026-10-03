@@ -1,0 +1,20 @@
+[package]
+name = "quittance-template"
+version = "0.1.0"
+description = "Rendu HTML des quittances de loyer à partir de templates embarqués"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+french-amount-words = { path = "../french-amount-words" }
+minijinja = "2.24.0"
+quittance-core = { path = "../quittance-core" }
+thiserror = "2.0.21"
+
+[dev-dependencies]
+time = { version = "0.3.55", features = ["macros"] }
