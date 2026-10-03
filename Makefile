@@ -1,5 +1,5 @@
 # Point d'entrée unique des commandes de développement, partagé par le hook git et la CI.
-.PHONY: setup format fmt-check lint quality build-debug test-unit build-release test-integration test-e2e ci msrv-check
+.PHONY: setup format fmt-check lint quality build-debug test-unit build-release test-integration test-e2e ci msrv-version msrv-check
 
 setup:
 	npm ci
@@ -44,8 +44,15 @@ test-integration:
 test-e2e:
 	@echo "test-e2e: aucun test e2e pour l'instant"
 
+# Affiche le rust-version déclaré dans Cargo.toml ; échoue s'il est introuvable.
+msrv-version:
+	@v=$$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml); \
+	if [ -z "$$v" ]; then echo "msrv-version: rust-version introuvable dans Cargo.toml" >&2; exit 1; fi; \
+	echo "$$v"
+
 # Vérifie la compilation avec le rust-version déclaré dans Cargo.toml (requiert rustup).
 msrv-check:
-	cargo +$$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml) check --workspace --all-targets --locked
+	@v=$$($(MAKE) -s msrv-version) || exit 1; \
+	cargo +$$v check --workspace --all-targets --locked
 
 ci: quality build-debug test-unit build-release test-integration test-e2e
