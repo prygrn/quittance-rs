@@ -68,8 +68,22 @@ impl AppConfig {
     /// Lit la configuration depuis une table de variables, sans accéder elle-même à
     /// l'environnement du processus. Les valeurs sont trimées ; une valeur vide est absente.
     pub fn from_variables(variables: &HashMap<String, String>) -> Result<Self, ConfigError> {
-        let _ = variables;
-        todo!()
+        let landlord = Party::new(
+            required_value(variables, variable_names::LANDLORD_NAME)?,
+            required_value(variables, variable_names::LANDLORD_ADDRESS)?,
+            required_value(variables, variable_names::LANDLORD_EMAIL)?,
+        )
+        .map_err(ConfigError::InvalidLandlord)?;
+        Ok(Self {
+            landlord,
+            issue_place: required_value(variables, variable_names::LANDLORD_CITY)?.to_owned(),
+            signature_path: PathBuf::from(required_value(
+                variables,
+                variable_names::SIGNATURE_PATH,
+            )?),
+            chrome_path: PathBuf::from(required_value(variables, variable_names::CHROME_PATH)?),
+            smtp: SmtpConfig::from_variables(variables).map_err(ConfigError::InvalidSmtp)?,
+        })
     }
 
     /// Bailleur, émetteur de la quittance et destinataire de sa copie cachée.
@@ -93,6 +107,18 @@ impl AppConfig {
     pub fn smtp(&self) -> &SmtpConfig {
         &self.smtp
     }
+}
+
+/// Valeur trimée ; une variable vide équivaut à une variable absente.
+fn required_value<'map>(
+    variables: &'map HashMap<String, String>,
+    name: &'static str,
+) -> Result<&'map str, ConfigError> {
+    variables
+        .get(name)
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .ok_or(ConfigError::MissingVariable(name))
 }
 
 #[cfg(test)]

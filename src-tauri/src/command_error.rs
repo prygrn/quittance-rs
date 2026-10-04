@@ -6,14 +6,13 @@ use quittance_mailer::MailError;
 use quittance_pdf::PdfError;
 use quittance_signature::SignatureError;
 use quittance_template::TemplateError;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::app_config::ConfigError;
 use crate::receipt_input_payload::ReceiptInputError;
 
 /// Source d'échec d'une commande, miroir exact de `CommandErrorCode` dans `src/api.ts`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandErrorCode {
     Validation,
     Template,
@@ -22,6 +21,27 @@ pub enum CommandErrorCode {
     Mail,
     Config,
     Unknown,
+}
+
+impl CommandErrorCode {
+    /// Valeur reçue par l'UI.
+    pub fn api_name(self) -> &'static str {
+        match self {
+            Self::Validation => "validation",
+            Self::Template => "template",
+            Self::Signature => "signature",
+            Self::Pdf => "pdf",
+            Self::Mail => "mail",
+            Self::Config => "config",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+impl Serialize for CommandErrorCode {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.api_name())
+    }
 }
 
 /// Erreur d'une commande Tauri : l'UI reçoit un rejet `{ code, message }`. Le message,
@@ -55,43 +75,39 @@ impl CommandError {
 
 impl fmt::Display for CommandError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _ = formatter;
-        todo!()
+        write!(formatter, "[{}] {}", self.code().api_name(), self.message())
     }
 }
 
 impl From<ReceiptInputError> for CommandError {
     fn from(error: ReceiptInputError) -> Self {
-        let _ = error;
-        todo!()
+        Self::from_error(CommandErrorCode::Validation, &error)
     }
 }
 
 impl From<ReceiptError> for CommandError {
     fn from(error: ReceiptError) -> Self {
-        let _ = error;
-        todo!()
+        Self::from_error(CommandErrorCode::Validation, &error)
     }
 }
 
 impl From<ConfigError> for CommandError {
     fn from(error: ConfigError) -> Self {
-        let _ = error;
-        todo!()
+        Self::from_error(CommandErrorCode::Config, &error)
     }
 }
 
 impl From<SignatureError> for CommandError {
     fn from(error: SignatureError) -> Self {
-        let _ = error;
-        todo!()
+        Self::from_error(CommandErrorCode::Signature, &error)
     }
 }
 
+/// Un montant impossible à écrire en lettres relève aussi du rendu : `src/api.ts` réserve
+/// `validation` aux refus de `quittance-core`.
 impl From<TemplateError> for CommandError {
     fn from(error: TemplateError) -> Self {
-        let _ = error;
-        todo!()
+        Self::from_error(CommandErrorCode::Template, &error)
     }
 }
 
@@ -101,17 +117,27 @@ impl From<PdfError> for CommandError {
     }
 }
 
+/// Une configuration SMTP invalide arrive enveloppée dans [`ConfigError`] ; toute autre
+/// erreur d'email relève de l'envoi.
 impl From<MailError> for CommandError {
     fn from(error: MailError) -> Self {
-        let _ = error;
-        todo!()
+        Self::from_error(CommandErrorCode::Mail, &error)
     }
 }
 
 /// Message de l'erreur suivi de ses causes, chacune omise si le message la reprend déjà.
 fn message_with_causes(error: &dyn Error) -> String {
-    let _ = error;
-    todo!()
+    let mut message = error.to_string();
+    let mut cause = error.source();
+    while let Some(source) = cause {
+        let source_message = source.to_string();
+        if !message.contains(&source_message) {
+            message.push_str(": ");
+            message.push_str(&source_message);
+        }
+        cause = source.source();
+    }
+    message
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use crate::command_error::CommandError;
+use crate::command_error::{CommandError, CommandErrorCode};
 
 /// Exécute une tâche bloquante (fichiers, Chromium, SMTP) sur le pool de threads dédié
 /// du runtime Tauri, pour ne bloquer ni la boucle d'événements ni la fenêtre.
@@ -8,8 +8,14 @@ where
     T: Send + 'static,
     Task: FnOnce() -> Result<T, CommandError> + Send + 'static,
 {
-    let _ = task;
-    todo!()
+    tauri::async_runtime::spawn_blocking(task)
+        .await
+        .unwrap_or_else(|join_error| {
+            Err(CommandError::new(
+                CommandErrorCode::Unknown,
+                format!("blocking command task did not complete: {join_error}"),
+            ))
+        })
 }
 
 #[cfg(test)]
@@ -19,7 +25,6 @@ mod tests {
     use tauri::async_runtime::block_on;
 
     use super::*;
-    use crate::command_error::CommandErrorCode;
 
     #[test]
     fn given_successful_task_when_dispatching_then_its_result_is_returned() {

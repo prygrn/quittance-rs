@@ -1,8 +1,9 @@
-use std::io;
+use std::fs::{self, File};
+use std::io::{self, Write};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Dossier `tmp/` à la racine du dépôt, ignoré par git.
-#[cfg_attr(not(debug_assertions), allow(dead_code))]
 const DEBUG_DIRECTORY: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../tmp");
 
 /// Conservation du PDF de chaque email envoyé, derrière un trait pour tester l'envoi avec
@@ -13,12 +14,10 @@ pub trait SentPdfArchive {
 
 /// Écrit chaque PDF dans un dossier, préfixé par un horodatage pour ne jamais écraser
 /// celui d'un envoi précédent sur la même période.
-#[cfg_attr(not(debug_assertions), allow(dead_code))]
 pub struct DirectoryPdfArchive {
     directory: PathBuf,
 }
 
-#[cfg_attr(not(debug_assertions), allow(dead_code))]
 impl DirectoryPdfArchive {
     pub fn new(directory: impl Into<PathBuf>) -> Self {
         Self {
@@ -29,13 +28,16 @@ impl DirectoryPdfArchive {
 
 impl SentPdfArchive for DirectoryPdfArchive {
     fn store(&self, file_name: &str, pdf: &[u8]) -> io::Result<()> {
-        let _ = (file_name, pdf);
-        todo!()
+        fs::create_dir_all(&self.directory)?;
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(io::Error::other)?
+            .as_nanos();
+        File::create_new(self.directory.join(format!("{timestamp}-{file_name}")))?.write_all(pdf)
     }
 }
 
 /// Ne conserve rien : les PDF ne sont gardés qu'en build debug, pour inspection.
-#[cfg_attr(debug_assertions, allow(dead_code))]
 pub struct DiscardingPdfArchive;
 
 impl SentPdfArchive for DiscardingPdfArchive {
@@ -47,15 +49,17 @@ impl SentPdfArchive for DiscardingPdfArchive {
 /// En build debug, les PDF envoyés sont écrits dans `tmp/` ; en release, ils ne sont
 /// conservés que par la copie cachée reçue par le bailleur.
 pub fn sent_pdf_archive_for_build() -> Box<dyn SentPdfArchive> {
-    todo!()
+    if cfg!(debug_assertions) {
+        Box::new(DirectoryPdfArchive::new(DEBUG_DIRECTORY))
+    } else {
+        Box::new(DiscardingPdfArchive)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::Path;
     use std::process;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
 

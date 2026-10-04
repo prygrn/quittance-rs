@@ -1,5 +1,11 @@
+use quittance_core::{Receipt, validate_receipt};
+use quittance_mailer::build_receipt_email;
+use quittance_signature::load_signature;
+use quittance_template::{IssueDetails, render_html};
+
+use crate::app_config::AppConfig;
 use crate::clock::Clock;
-use crate::command_error::CommandError;
+use crate::command_error::{CommandError, CommandErrorCode};
 use crate::config_source::ConfigSource;
 use crate::delivery_factory::DeliveryFactory;
 use crate::receipt_input_payload::ReceiptInputPayload;
@@ -14,6 +20,12 @@ pub struct ReceiptService<'a> {
     pub sent_pdf_archive: &'a dyn SentPdfArchive,
 }
 
+/// Quittance validée et son HTML, signature protégée comprise.
+struct RenderedReceipt {
+    receipt: Receipt,
+    html: String,
+}
+
 impl ReceiptService<'_> {
     /// HTML complet de la quittance, signature protégée comprise, tel qu'il sera imprimé.
     pub fn preview(
@@ -21,15 +33,53 @@ impl ReceiptService<'_> {
         template_id: &str,
         input: ReceiptInputPayload,
     ) -> Result<String, CommandError> {
-        let _ = (template_id, input, self.config_source, self.clock);
-        todo!()
+        let config = self.load_config()?;
+        Ok(self.render(&config, template_id, input)?.html)
     }
 
     /// Régénère la quittance, l'imprime en PDF et l'envoie au locataire, avec copie cachée
-    /// au bailleur.
+    /// au bailleur. Le PDF est archivé avant l'envoi : un échec d'archivage n'envoie rien.
     pub fn send(&self, template_id: &str, input: ReceiptInputPayload) -> Result<(), CommandError> {
-        let _ = (template_id, input, self.delivery, self.sent_pdf_archive);
-        todo!()
+        let config = self.load_config()?;
+        let rendered = self.render(&config, template_id, input)?;
+        let pdf_renderer = self.delivery.pdf_renderer(config.chrome_path())?;
+        let mailer = self.delivery.mailer(config.smtp())?;
+        let pdf = pdf_renderer.render(&rendered.html)?;
+        let email = build_receipt_email(&rendered.receipt, pdf)?;
+        let attachment = email.attachment();
+        self.sent_pdf_archive
+            .store(attachment.file_name(), attachment.content())
+            .map_err(|error| {
+                CommandError::new(
+                    CommandErrorCode::Unknown,
+                    format!(
+                        "sent PDF `{}` could not be archived: {error}",
+                        attachment.file_name()
+                    ),
+                )
+            })?;
+        mailer.send(&email)?;
+        Ok(())
+    }
+
+    fn load_config(&self) -> Result<AppConfig, CommandError> {
+        Ok(AppConfig::from_variables(&self.config_source.variables())?)
+    }
+
+    fn render(
+        &self,
+        config: &AppConfig,
+        template_id: &str,
+        input: ReceiptInputPayload,
+    ) -> Result<RenderedReceipt, CommandError> {
+        let receipt = validate_receipt(config.landlord().clone(), input.into_receipt_input()?)?;
+        let signature = load_signature(config.signature_path())?.protect_for_receipt(&receipt);
+        let issue = IssueDetails {
+            place: config.issue_place().to_owned(),
+            date: self.clock.today(),
+        };
+        let html = render_html(template_id, &receipt, &issue, Some(signature.data_uri()))?;
+        Ok(RenderedReceipt { receipt, html })
     }
 }
 

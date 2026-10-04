@@ -10,8 +10,10 @@ pub struct TemplateInfoPayload {
 
 impl From<TemplateInfo> for TemplateInfoPayload {
     fn from(template: TemplateInfo) -> Self {
-        let _ = template;
-        todo!()
+        Self {
+            id: template.id,
+            label: template.label,
+        }
     }
 }
 

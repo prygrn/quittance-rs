@@ -1,8 +1,10 @@
 use std::error::Error;
 use std::fmt;
 
-use quittance_core::ReceiptInput;
+use quittance_core::{Date, ReceiptInput};
 use serde::Deserialize;
+
+use crate::iso_date::parse_iso_date;
 
 /// Saisie de quittance telle que l'UI l'envoie (`ReceiptInput` de `src/api.ts`) :
 /// champs en camelCase, dates ISO `YYYY-MM-DD`, montants en centimes entiers.
@@ -45,8 +47,22 @@ impl Error for ReceiptInputError {}
 impl ReceiptInputPayload {
     /// Convertit la saisie en `ReceiptInput` typé, que `quittance-core` valide ensuite.
     pub fn into_receipt_input(self) -> Result<ReceiptInput, ReceiptInputError> {
-        todo!()
+        Ok(ReceiptInput {
+            period_start: parsed_date("periodStart", self.period_start)?,
+            period_end: parsed_date("periodEnd", self.period_end)?,
+            payment_date: parsed_date("paymentDate", self.payment_date)?,
+            tenant_name: self.tenant_name,
+            tenant_address: self.tenant_address,
+            tenant_email: self.tenant_email,
+            property_address: self.property_address,
+            rent_cents: self.rent_cents,
+            charges_cents: self.charges_cents,
+        })
     }
+}
+
+fn parsed_date(field: &'static str, value: String) -> Result<Date, ReceiptInputError> {
+    parse_iso_date(&value).ok_or(ReceiptInputError::InvalidIsoDate { field, value })
 }
 
 #[cfg(test)]

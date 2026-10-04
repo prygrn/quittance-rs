@@ -13,7 +13,9 @@ impl ConfigSource for EnvironmentConfigSource {
     /// Une variable dont le nom ou la valeur n'est pas en UTF-8 est ignorée : elle ne peut
     /// pas appartenir à la configuration.
     fn variables(&self) -> HashMap<String, String> {
-        todo!()
+        std::env::vars_os()
+            .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
+            .collect()
     }
 }
 

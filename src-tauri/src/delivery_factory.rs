@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use quittance_mailer::{MailError, Mailer, SmtpConfig};
-use quittance_pdf::{PdfError, PdfRenderer};
+use quittance_mailer::{MailError, Mailer, SmtpConfig, SmtpMailer};
+use quittance_pdf::{ChromiumPdfRenderer, PdfError, PdfRenderer};
 
 /// Crée, à partir de la configuration chargée, les effets de bord de l'envoi : rendu PDF
 /// et envoi de l'email. Derrière un trait pour tester l'envoi avec des fakes.
@@ -15,13 +15,11 @@ pub struct ChromiumSmtpDelivery;
 
 impl DeliveryFactory for ChromiumSmtpDelivery {
     fn pdf_renderer(&self, chrome_path: &Path) -> Result<Box<dyn PdfRenderer>, PdfError> {
-        let _ = chrome_path;
-        todo!()
+        Ok(Box::new(ChromiumPdfRenderer::new(chrome_path)?))
     }
 
     fn mailer(&self, smtp: &SmtpConfig) -> Result<Box<dyn Mailer>, MailError> {
-        let _ = smtp;
-        todo!()
+        Ok(Box::new(SmtpMailer::new(smtp)?))
     }
 }
 

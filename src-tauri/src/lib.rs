@@ -1,8 +1,6 @@
 //! Application desktop : lit la configuration du bailleur et assemble les crates de feature
 //! derrière les commandes Tauri appelées par l'UI (`src/api.ts`).
 
-// Temporaire : API en stubs, retiré avec l'implémentation.
-#![allow(dead_code)]
 mod app_config;
 mod blocking_dispatch;
 mod clock;

@@ -3,8 +3,31 @@ use quittance_core::Date;
 /// Lit une date au format ISO `YYYY-MM-DD`, celui d'un `<input type="date">`.
 /// Renvoie `None` pour toute autre forme ou pour une date inexistante.
 pub fn parse_iso_date(text: &str) -> Option<Date> {
-    let _ = text;
-    todo!()
+    let bytes = text.as_bytes();
+    let is_iso_shape = bytes.len() == iso_layout::LENGTH
+        && iso_layout::SEPARATOR_POSITIONS
+            .iter()
+            .all(|&position| bytes[position] == iso_layout::SEPARATOR)
+        && bytes
+            .iter()
+            .enumerate()
+            .filter(|(position, _)| !iso_layout::SEPARATOR_POSITIONS.contains(position))
+            .all(|(_, byte)| byte.is_ascii_digit());
+    if !is_iso_shape {
+        return None;
+    }
+    // Forme vérifiée : uniquement des chiffres ASCII aux positions découpées.
+    let year: i32 = text[0..4].parse().ok()?;
+    let month: u8 = text[5..7].parse().ok()?;
+    let day: u8 = text[8..10].parse().ok()?;
+    Date::from_calendar_date(year, month.try_into().ok()?, day).ok()
+}
+
+/// Forme `YYYY-MM-DD` : dix caractères, tirets en cinquième et huitième positions.
+mod iso_layout {
+    pub const LENGTH: usize = 10;
+    pub const SEPARATOR: u8 = b'-';
+    pub const SEPARATOR_POSITIONS: [usize; 2] = [4, 7];
 }
 
 #[cfg(test)]

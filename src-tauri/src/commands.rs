@@ -14,7 +14,10 @@ use crate::template_info_payload::TemplateInfoPayload;
 /// Modèles de quittance, dans l'ordre d'affichage.
 #[tauri::command]
 pub fn list_templates() -> Vec<TemplateInfoPayload> {
-    todo!()
+    quittance_template::list_templates()
+        .into_iter()
+        .map(TemplateInfoPayload::from)
+        .collect()
 }
 
 /// HTML complet de la quittance pour l'aperçu.
@@ -23,17 +26,10 @@ pub async fn preview_receipt(
     template_id: String,
     input: ReceiptInputPayload,
 ) -> Result<String, CommandError> {
-    let _ = (
-        template_id,
-        input,
-        run_blocking::<(), fn() -> Result<(), CommandError>>,
-    );
-    let _ = (SystemClock, EnvironmentConfigSource, ChromiumSmtpDelivery);
-    let _ = (
-        sent_pdf_archive_for_build,
-        std::mem::size_of::<ReceiptService>(),
-    );
-    todo!()
+    logged(
+        run_blocking(move || with_system_service(|service| service.preview(&template_id, input)))
+            .await,
+    )
 }
 
 /// Génère le PDF de la quittance et l'envoie au locataire, avec copie cachée au bailleur.
@@ -42,8 +38,29 @@ pub async fn send_receipt(
     template_id: String,
     input: ReceiptInputPayload,
 ) -> Result<(), CommandError> {
-    let _ = (template_id, input);
-    todo!()
+    logged(
+        run_blocking(move || with_system_service(|service| service.send(&template_id, input)))
+            .await,
+    )
+}
+
+/// Service branché sur l'environnement, l'horloge système, Chromium et SMTP.
+fn with_system_service<T>(action: impl FnOnce(&ReceiptService<'_>) -> T) -> T {
+    let sent_pdf_archive = sent_pdf_archive_for_build();
+    action(&ReceiptService {
+        config_source: &EnvironmentConfigSource,
+        clock: &SystemClock,
+        delivery: &ChromiumSmtpDelivery,
+        sent_pdf_archive: sent_pdf_archive.as_ref(),
+    })
+}
+
+/// Trace l'échec côté backend, code d'erreur compris, avant de le renvoyer à l'UI.
+fn logged<T>(result: Result<T, CommandError>) -> Result<T, CommandError> {
+    if let Err(error) = &result {
+        eprintln!("command failed: {error}");
+    }
+    result
 }
 
 #[cfg(test)]

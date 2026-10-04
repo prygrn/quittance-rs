@@ -23,8 +23,16 @@ impl Clock for SystemClock {
 
 /// Date UTC du nombre de secondes écoulées depuis le 1er janvier 1970.
 fn date_from_unix_seconds(seconds: u64) -> Date {
-    let _ = seconds;
-    todo!()
+    let elapsed_days = i32::try_from(seconds / unix_time::SECONDS_PER_DAY)
+        .expect("system clock is within the representable range of dates");
+    Date::from_julian_day(unix_time::EPOCH_JULIAN_DAY + elapsed_days)
+        .expect("system clock is within the representable range of dates")
+}
+
+mod unix_time {
+    pub const SECONDS_PER_DAY: u64 = 86_400;
+    /// Jour julien du 1er janvier 1970.
+    pub const EPOCH_JULIAN_DAY: i32 = 2_440_588;
 }
 
 #[cfg(test)]
