@@ -91,6 +91,9 @@ const COMMAND_ERROR_CODES: readonly CommandErrorCode[] = [
   "unknown",
 ];
 
+// Tout log d'erreur commence par son code entre crochets.
+const LOGGED_ERROR_CODE = /^\[UI_[A-Z_]+\] /;
+
 interface PendingCall<T> {
   readonly request: PreviewRequest;
   readonly resolve: (value: T) => void;
@@ -290,6 +293,95 @@ describe("mountReceiptScreen: empty screen", () => {
     expect(plainText("preview-failure")).toContain(COMMAND_ERROR_MESSAGES.template.title);
     expect(byId<HTMLButtonElement>("preview-button").disabled).toBe(true);
   });
+
+  it("hides the hint to rerun the preview when templates cannot be listed", async () => {
+    // Arrange
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    // Act
+    await mountScreen(Promise.reject({ code: "config" }));
+
+    // Assert
+    const hint = byId("preview-failure").querySelector<HTMLElement>(".pane-failure-hint");
+    expect(hint?.hidden).toBe(true);
+  });
+
+  it("keeps the preview disabled until the templates are listed", async () => {
+    // Arrange
+    const fake = createFakeGateway(new Promise<readonly TemplateInfo[]>(() => undefined));
+
+    // Act
+    void mountReceiptScreen({ root: document, gateway: fake.gateway });
+    await settle();
+
+    // Assert
+    expect(byId<HTMLButtonElement>("preview-button").disabled).toBe(true);
+  });
+
+  it("shows the application title bar", async () => {
+    // Arrange & Act
+    await mountScreen();
+
+    // Assert
+    expect(plainText("title-bar")).toBe("Quittances de loyer");
+  });
+
+  it("rejects with an explicit error when the markup lacks an expected element", async () => {
+    // Arrange
+    byId("preview-frame").remove();
+    const fake = createFakeGateway(Promise.resolve(TEMPLATES));
+
+    // Act
+    const mounting = mountReceiptScreen({ root: document, gateway: fake.gateway });
+
+    // Assert
+    await expect(mounting).rejects.toThrow("UI_MARKUP_MISMATCH");
+  });
+});
+
+describe("mountReceiptScreen: error logging", () => {
+  it("logs a template listing failure with an error code", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const rejection = { code: "config" };
+
+    // Act
+    await mountScreen(Promise.reject(rejection));
+
+    // Assert
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
+  });
+
+  it("logs a preview failure with an error code", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    fillForm(FILLED_VALUES);
+    await clickButton("preview-button");
+    const rejection = { code: "template" };
+
+    // Act
+    fake.previewCalls[0]?.reject(rejection);
+    await settle();
+
+    // Assert
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
+  });
+
+  it("logs a send failure with an error code", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+
+    // Act
+    await failSending(fake, "mail");
+
+    // Assert
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), {
+      code: "mail",
+      message: "détail technique",
+    });
+  });
 });
 
 describe("mountReceiptScreen: input errors", () => {
@@ -450,9 +542,75 @@ describe("mountReceiptScreen: preview pending", () => {
     expect(statusText()).toBe("À régénérer");
     expect(byId<HTMLButtonElement>("send-button").disabled).toBe(true);
   });
+
+  it("ignores a preview failure that arrives after the form was edited", async () => {
+    // Arrange
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    fillForm(FILLED_VALUES);
+    await clickButton("preview-button");
+    typeInto("rentAmount", "700");
+
+    // Act
+    fake.previewCalls[0]?.reject({ code: "template" });
+    await settle();
+
+    // Assert
+    expect(isShown("preview-failure")).toBe(false);
+    expect(isShown("preview-empty")).toBe(true);
+    expect(statusText()).toBe("À régénérer");
+    expect(byId<HTMLButtonElement>("send-button").disabled).toBe(true);
+  });
+
+  it.each([
+    {
+      outcome: "preview",
+      answer: (call: PendingCall<string> | undefined) => call?.resolve(PREVIEW_HTML),
+    },
+    {
+      outcome: "failure",
+      answer: (call: PendingCall<string> | undefined) => call?.reject({ code: "template" }),
+    },
+  ])(
+    "ignores the $outcome of a first request answering while a second one is pending",
+    async ({ answer }) => {
+      // Arrange
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const fake = await mountScreen();
+      fillForm(FILLED_VALUES);
+      await clickButton("preview-button");
+      typeInto("rentAmount", "700");
+      await clickButton("preview-button");
+
+      // Act
+      answer(fake.previewCalls[0]);
+      await settle();
+
+      // Assert
+      expect(fake.previewCalls).toHaveLength(2);
+      expect(statusText()).toBe("Génération…");
+      expect(isShown("preview-loading")).toBe(true);
+      expect(isShown("preview-page")).toBe(false);
+      expect(isShown("preview-failure")).toBe(false);
+      expect(byId<HTMLButtonElement>("send-button").disabled).toBe(true);
+    },
+  );
 });
 
 describe("mountReceiptScreen: preview ready", () => {
+  it("shows the recipient while the preview needs regenerating", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await previewFilledReceipt(fake);
+
+    // Act
+    typeInto("chargesAmount", "90");
+
+    // Assert
+    expect(isShown("recipient-line")).toBe(true);
+    expect(plainText("recipient-line")).toContain(FILLED_INPUT.tenantEmail);
+  });
+
   it("shows the backend preview in a sandboxed frame and enables sending", async () => {
     // Arrange
     const fake = await mountScreen();
@@ -624,6 +782,22 @@ describe("mountReceiptScreen: sending", () => {
 
     // Assert
     expect(isShown("preview-page")).toBe(true);
+  });
+
+  it("keeps the outcome of a send when an input event fires while sending", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await previewFilledReceipt(fake);
+    await clickButton("send-button");
+    typeInto("rentAmount", "700");
+
+    // Act
+    fake.sendCalls[0]?.resolve();
+    await settle();
+
+    // Assert
+    expect(isShown("send-success")).toBe(true);
+    expect(statusText()).toBe("Envoyée");
   });
 });
 
