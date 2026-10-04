@@ -88,6 +88,16 @@ mod tests {
     const SECRET: &str = "s3cret";
 
     #[test]
+    fn given_failed_command_when_logging_then_line_carries_error_code_and_message() {
+        let error = CommandError::new(CommandErrorCode::Mail, "connection refused");
+
+        let line = failure_log_line(&error);
+
+        assert!(line.contains("[mail]"), "{line}");
+        assert!(line.contains("connection refused"), "{line}");
+    }
+
+    #[test]
     fn given_malformed_env_file_holding_a_secret_when_reporting_the_error_then_secret_is_neither_sent_nor_logged()
      {
         let malformed_contents = [
