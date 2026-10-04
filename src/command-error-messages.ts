@@ -4,11 +4,32 @@ import type { CommandErrorCode } from "./api";
 export const COMMAND_ERROR_MESSAGES: Readonly<
   Record<CommandErrorCode, Readonly<{ title: string; text: string }>>
 > = {
-  validation: { title: "", text: "" },
-  template: { title: "", text: "" },
-  signature: { title: "", text: "" },
-  config: { title: "", text: "" },
-  pdf: { title: "", text: "" },
-  mail: { title: "", text: "" },
-  unknown: { title: "", text: "" },
+  validation: {
+    title: "Les informations ont été refusées",
+    text: "Certaines valeurs n'ont pas été acceptées pour générer la quittance. Vérifiez le formulaire.",
+  },
+  template: {
+    title: "Le modèle de quittance est inutilisable",
+    text: "Le modèle choisi n'a pas pu être chargé : il est peut-être incomplet ou endommagé.",
+  },
+  signature: {
+    title: "La signature est introuvable",
+    text: "Le fichier de signature indiqué dans votre configuration est absent ou illisible.",
+  },
+  config: {
+    title: "La configuration est incomplète",
+    text: "Il manque des informations sur le bailleur ou sur l'envoi des emails dans le fichier de configuration. Complétez-le.",
+  },
+  pdf: {
+    title: "Le PDF n'a pas pu être créé",
+    text: "La quittance n'a pas été envoyée. Vous pouvez réessayer sans refaire l'aperçu.",
+  },
+  mail: {
+    title: "Le mail n'a pas pu partir",
+    text: "Le serveur d'envoi n'a pas répondu ou a refusé le message. Vérifiez votre connexion internet, puis réessayez. Rien n'a été envoyé.",
+  },
+  unknown: {
+    title: "Une erreur inattendue s'est produite",
+    text: "La quittance n'a pas été envoyée. Réessayez ; si le problème persiste, redémarrez l'application.",
+  },
 };

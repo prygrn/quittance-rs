@@ -7,7 +7,7 @@ export interface ReceiptInput {
   tenantAddress: string;
   tenantEmail: string;
   propertyAddress: string;
-  /** Date ISO `YYYY-MM-DD`, format natif de `<input type="date">`. */
+  /** Date ISO `YYYY-MM-DD`, convertie par l'écran depuis la saisie `jj/mm/aaaa`. */
   periodStart: string;
   periodEnd: string;
   /** Montants entiers en centimes, pour éviter toute erreur d'arrondi. */
