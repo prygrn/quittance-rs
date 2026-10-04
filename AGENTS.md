@@ -23,7 +23,7 @@ Update a comment in the same change as the code it describes.
 Write code, identifiers, test names, and log messages in English.
 Use consistent terminology for the same concept throughout the codebase.
 Do not abbreviate identifiers.
-As an exception to the no-abbreviation rule, loop counters may be single letters.
+As an exception to the kernel rule "Do not abbreviate identifiers.", loop counters may be single letters.
 
 ## Kernel — git
 
@@ -37,11 +37,11 @@ Use one of these commit types: feat, fix, test, refactor, chore, docs.
 Write the commit description in imperative mood, in English, with no trailing period.
 Start the commit description with a lowercase letter.
 Do not add a commit body or footer.
-As an exception to the no-body-or-footer rule, a breaking change carries a BREAKING CHANGE footer.
+As an exception to the kernel rule "Do not add a commit body or footer.", a breaking change carries a BREAKING CHANGE footer.
 Do not squash commits.
 Keep secrets, dependency directories, and build output out of version control.
 Develop each feature in a worktree separate from the main branch.
-As an exception to the worktree rule, an explicit user instruction may let an agent work outside a worktree.
+As an exception to the kernel rule "Develop each feature in a worktree separate from the main branch.", an explicit user instruction may let an agent work outside a worktree.
 Stop and flag before committing when a hardcoded secret is found in the code.
 Run the linter and the test suite before every commit.
 Do not commit while the linter reports an issue.
@@ -57,7 +57,8 @@ These rules define what a valid rule is. They apply to themselves.
 - A rule is unambiguous.
 - A rule is verifiable.
 - A rule contains no "but" and no "except when".
-- An exception is a separate rule that names the rule it restricts.
+- An exception is a separate rule that quotes word for word the rule it restricts.
+- An exception to a kernel rule opens with: As an exception to the kernel rule "<quoted rule>".
 - A rule that applies only under a condition states that condition first.
 - A rule is written in English.
 - A rule earns its brevity from atomicity, not from dropped words.
@@ -163,7 +164,7 @@ Name environment variables in UPPER_SNAKE_CASE.
 Scope each constant to the smallest context that needs it.
 Group related constants together in a single named construct.
 Prefix boolean names with is, has, or should.
-As an exception to the kernel no-abbreviation rule, API, URL, JWT, SSE, err for error, and ctx for context are allowed.
+As an exception to the kernel rule "Do not abbreviate identifiers.", API, URL, JWT, SSE, err for error, and ctx for context are allowed.
 Define custom error types for domain-specific failures.
 
 ## Project — workflow

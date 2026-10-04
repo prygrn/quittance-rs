@@ -20,5 +20,5 @@ Name environment variables in UPPER_SNAKE_CASE.
 Scope each constant to the smallest context that needs it.
 Group related constants together in a single named construct.
 Prefix boolean names with is, has, or should.
-As an exception to the kernel no-abbreviation rule, API, URL, JWT, SSE, err for error, and ctx for context are allowed.
+As an exception to the kernel rule "Do not abbreviate identifiers.", API, URL, JWT, SSE, err for error, and ctx for context are allowed.
 Define custom error types for domain-specific failures.
