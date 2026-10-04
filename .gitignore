@@ -28,3 +28,9 @@ target
 # Node / Vite
 node_modules/
 dist/
+
+# Tauri
+src-tauri/gen/
+
+# PDF des mails envoyés en build debug, pour inspection
+tmp/
