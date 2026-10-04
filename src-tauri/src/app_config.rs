@@ -29,8 +29,31 @@ pub enum ConfigError {
     /// Fichier `.env` présent mais illisible ou mal formé.
     UnreadableEnvFile {
         path: PathBuf,
-        source: dotenvy::Error,
+        problem: EnvFileProblem,
     },
+}
+
+/// Cause d'un fichier `.env` illisible. Elle ne reprend jamais le contenu du fichier, qui
+/// peut contenir le mot de passe SMTP : le message part vers l'UI et les traces.
+#[derive(Debug)]
+pub enum EnvFileProblem {
+    Io(io::Error),
+    MalformedEntry { valid_entries_before: usize },
+}
+
+impl fmt::Display for EnvFileProblem {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(source) => write!(formatter, "{source}"),
+            Self::MalformedEntry {
+                valid_entries_before,
+            } => write!(
+                formatter,
+                "the entry following {valid_entries_before} valid entries is malformed \
+                 (content withheld to keep secrets out of reports)"
+            ),
+        }
+    }
 }
 
 impl fmt::Display for ConfigError {
@@ -52,9 +75,9 @@ impl fmt::Display for ConfigError {
                 formatter,
                 "executable directory holding the .env file cannot be found: {source}"
             ),
-            Self::UnreadableEnvFile { path, source } => write!(
+            Self::UnreadableEnvFile { path, problem } => write!(
                 formatter,
-                "env file `{}` cannot be read: {source}",
+                "env file `{}` cannot be read: {problem}",
                 path.display()
             ),
         }
@@ -68,7 +91,10 @@ impl Error for ConfigError {
             Self::InvalidLandlord(source) => Some(source),
             Self::InvalidSmtp(source) => Some(source),
             Self::UnknownExecutableLocation(source) => Some(source),
-            Self::UnreadableEnvFile { source, .. } => Some(source),
+            Self::UnreadableEnvFile { problem, .. } => match problem {
+                EnvFileProblem::Io(source) => Some(source),
+                EnvFileProblem::MalformedEntry { .. } => None,
+            },
         }
     }
 }

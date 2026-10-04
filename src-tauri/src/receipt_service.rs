@@ -102,7 +102,7 @@ mod tests {
     use quittance_template::{IssueDetails, render_html};
 
     use super::*;
-    use crate::app_config::ConfigError;
+    use crate::app_config::{ConfigError, EnvFileProblem};
     use crate::test_support::{
         CHROME_PATH, DeliveryEvent, FAKE_PDF, FakeConfigSource, FakeDelivery, FakePdfArchive,
         STANDARD_TEMPLATE_ID, complete_variables, date, sample_payload,
@@ -348,7 +348,9 @@ mod tests {
         let mut harness = Harness::new();
         harness.config_source.failure = Some(|| ConfigError::UnreadableEnvFile {
             path: PathBuf::from("/opt/quittance/.env"),
-            source: dotenvy::Error::LineParse("LANDLORD_CITY='Lyon".to_owned(), 14),
+            problem: EnvFileProblem::MalformedEntry {
+                valid_entries_before: 3,
+            },
         });
 
         assert_code(harness.preview(sample_payload()), CommandErrorCode::Config);

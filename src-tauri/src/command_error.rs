@@ -151,6 +151,7 @@ mod tests {
     use tauri::ipc::InvokeError;
 
     use super::*;
+    use crate::app_config::EnvFileProblem;
     use crate::test_support::{date, from_ipc_json, sample_payload, to_ipc_json};
 
     /// Erreur produite par `quittance-template` pour un total trop grand pour être écrit
@@ -264,7 +265,9 @@ mod tests {
             ConfigError::UnknownExecutableLocation(io::Error::from(io::ErrorKind::NotFound)),
             ConfigError::UnreadableEnvFile {
                 path: PathBuf::from("/opt/quittance/.env"),
-                source: dotenvy::Error::LineParse("LANDLORD_CITY='Lyon".to_owned(), 14),
+                problem: EnvFileProblem::MalformedEntry {
+                    valid_entries_before: 3,
+                },
             },
         ];
 
@@ -286,7 +289,9 @@ mod tests {
     fn given_unreadable_env_file_when_converting_then_message_names_the_file() {
         let command_error = CommandError::from(ConfigError::UnreadableEnvFile {
             path: PathBuf::from("/opt/quittance/.env"),
-            source: dotenvy::Error::LineParse("LANDLORD_CITY='Lyon".to_owned(), 14),
+            problem: EnvFileProblem::MalformedEntry {
+                valid_entries_before: 3,
+            },
         });
 
         assert!(command_error.message().contains("/opt/quittance/.env"));

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::app_config::ConfigError;
+use crate::app_config::{ConfigError, EnvFileProblem};
 
 /// Nom du fichier de configuration, placé à côté de l'exécutable.
 const ENV_FILE_NAME: &str = ".env";
@@ -58,14 +58,32 @@ impl ConfigSource for EnvFileConfigSource {
 
 impl EnvFileConfigSource {
     fn env_file_variables(&self) -> Result<HashMap<String, String>, ConfigError> {
-        let unreadable = |source| ConfigError::UnreadableEnvFile {
-            path: self.env_file().to_owned(),
-            source,
+        let entries = match dotenvy::from_path_iter(self.env_file()) {
+            Ok(entries) => entries,
+            Err(error) if error.not_found() => return Ok(HashMap::new()),
+            Err(error) => return Err(self.unreadable(error, 0)),
         };
-        match dotenvy::from_path_iter(self.env_file()) {
-            Ok(entries) => entries.collect::<Result<_, _>>().map_err(unreadable),
-            Err(error) if error.not_found() => Ok(HashMap::new()),
-            Err(error) => Err(unreadable(error)),
+        let mut variables = HashMap::new();
+        for (valid_entries_before, entry) in entries.enumerate() {
+            let (name, value) =
+                entry.map_err(|error| self.unreadable(error, valid_entries_before))?;
+            variables.insert(name, value);
+        }
+        Ok(variables)
+    }
+
+    /// Seule une erreur d'entrée-sortie est conservée : les autres erreurs de dotenvy
+    /// recopient la ligne fautive, voire la suite du fichier.
+    fn unreadable(&self, error: dotenvy::Error, valid_entries_before: usize) -> ConfigError {
+        let problem = match error {
+            dotenvy::Error::Io(source) => EnvFileProblem::Io(source),
+            _ => EnvFileProblem::MalformedEntry {
+                valid_entries_before,
+            },
+        };
+        ConfigError::UnreadableEnvFile {
+            path: self.env_file().to_owned(),
+            problem,
         }
     }
 }
