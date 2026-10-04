@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quittances de loyer</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div class="app">
+      <div id="title-bar" class="title-bar">Quittances de loyer</div>
+      <div class="screen">
+        <form id="receipt-form" class="form-panel" novalidate aria-busy="false">
+          <header class="form-header">
+            <h1>Nouvelle quittance</h1>
+            <p>Tous les champs sont obligatoires</p>
+          </header>
+
+          <fieldset id="form-controls" class="form-controls">
+            <div class="field">
+              <label for="template">Modèle de quittance</label>
+              <select id="template" name="template" required></select>
+            </div>
+
+            <fieldset class="field-group">
+              <legend>Locataire</legend>
+              <div class="field">
+                <label for="tenant-name">Nom du locataire</label>
+                <input id="tenant-name" name="tenantName" type="text" autocomplete="off" required />
+                <p id="tenant-name-error" class="field-error" hidden>
+                  <span class="field-error-mark" aria-hidden="true">!</span>
+                  <span class="field-error-text"></span>
+                </p>
+              </div>
+              <div class="field">
+                <label for="tenant-address">Adresse du locataire</label>
+                <textarea id="tenant-address" name="tenantAddress" rows="2" required></textarea>
+                <p id="tenant-address-error" class="field-error" hidden>
+                  <span class="field-error-mark" aria-hidden="true">!</span>
+                  <span class="field-error-text"></span>
+                </p>
+              </div>
+              <div class="field">
+                <label for="tenant-email">Email du locataire</label>
+                <input
+                  id="tenant-email"
+                  name="tenantEmail"
+                  type="email"
+                  autocomplete="off"
+                  required
+                />
+                <p id="tenant-email-error" class="field-error" hidden>
+                  <span class="field-error-mark" aria-hidden="true">!</span>
+                  <span class="field-error-text"></span>
+                </p>
+              </div>
+            </fieldset>
+
+            <fieldset class="field-group">
+              <legend>Logement et période</legend>
+              <div class="field">
+                <label for="property-address">Adresse du logement</label>
+                <textarea id="property-address" name="propertyAddress" rows="2" required></textarea>
+                <p id="property-address-error" class="field-error" hidden>
+                  <span class="field-error-mark" aria-hidden="true">!</span>
+                  <span class="field-error-text"></span>
+                </p>
+              </div>
+              <div class="field-pair">
+                <div class="field">
+                  <label for="period-start">Début de période</label>
+                  <input
+                    id="period-start"
+                    name="periodStart"
+                    class="numeric"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="jj/mm/aaaa"
+                    autocomplete="off"
+                    required
+                  />
+                  <p id="period-start-error" class="field-error" hidden>
+                    <span class="field-error-mark" aria-hidden="true">!</span>
+                    <span class="field-error-text"></span>
+                  </p>
+                </div>
+                <div class="field">
+                  <label for="period-end">Fin de période</label>
+                  <input
+                    id="period-end"
+                    name="periodEnd"
+                    class="numeric"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="jj/mm/aaaa"
+                    autocomplete="off"
+                    required
+                  />
+                  <p id="period-end-error" class="field-error" hidden>
+                    <span class="field-error-mark" aria-hidden="true">!</span>
+                    <span class="field-error-text"></span>
+                  </p>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="field-group">
+              <legend>Paiement</legend>
+              <div class="field-pair">
+                <div class="field">
+                  <label for="rent-amount">Loyer (€)</label>
+                  <input
+                    id="rent-amount"
+                    name="rentAmount"
+                    class="numeric amount"
+                    type="text"
+                    inputmode="decimal"
+                    placeholder="650"
+                    autocomplete="off"
+                    required
+                  />
+                  <p id="rent-amount-error" class="field-error" hidden>
+                    <span class="field-error-mark" aria-hidden="true">!</span>
+                    <span class="field-error-text"></span>
+                  </p>
+                </div>
+                <div class="field">
+                  <label for="charges-amount">Forfait de charges (€)</label>
+                  <input
+                    id="charges-amount"
+                    name="chargesAmount"
+                    class="numeric amount"
+                    type="text"
+                    inputmode="decimal"
+                    placeholder="80"
+                    autocomplete="off"
+                    required
+                  />
+                  <p id="charges-amount-error" class="field-error" hidden>
+                    <span class="field-error-mark" aria-hidden="true">!</span>
+                    <span class="field-error-text"></span>
+                  </p>
+                </div>
+              </div>
+              <div class="total">
+                <label for="total">Total (loyer + forfait de charges)</label>
+                <output id="total" name="total" for="rent-amount charges-amount" aria-live="polite">
+                  —
+                </output>
+              </div>
+              <div class="field payment-date">
+                <label for="payment-date">Date de paiement</label>
+                <input
+                  id="payment-date"
+                  name="paymentDate"
+                  class="numeric"
+                  type="text"
+                  inputmode="numeric"
+                  placeholder="jj/mm/aaaa"
+                  autocomplete="off"
+                  required
+                />
+                <p id="payment-date-error" class="field-error" hidden>
+                  <span class="field-error-mark" aria-hidden="true">!</span>
+                  <span class="field-error-text"></span>
+                </p>
+              </div>
+            </fieldset>
+          </fieldset>
+
+          <footer class="form-footer">
+            <p id="announcement" class="visually-hidden" role="status" aria-live="polite"></p>
+
+            <div id="error-summary" class="banner banner-error" role="alert" hidden>
+              <span class="banner-mark" aria-hidden="true">!</span>
+              <span class="banner-text"></span>
+            </div>
+            <div id="stale-banner" class="banner banner-info" hidden>
+              <span class="banner-mark" aria-hidden="true">i</span>
+              <span>Le formulaire a été modifié. Relancez l'aperçu avant d'envoyer.</span>
+            </div>
+            <div id="send-success" class="banner banner-success" hidden>
+              <span class="banner-mark" aria-hidden="true">✓</span>
+              <div class="banner-body">
+                <strong class="banner-title">Quittance envoyée</strong>
+                <span>
+                  Le mail est parti à <strong class="banner-recipient"></strong>. Une copie cachée
+                  vous a été adressée pour vos archives.
+                </span>
+              </div>
+            </div>
+            <div id="send-failure" class="banner banner-error" role="alert" hidden>
+              <span class="banner-mark" aria-hidden="true">!</span>
+              <div class="banner-body">
+                <strong class="banner-title"></strong>
+                <span class="banner-text"></span>
+              </div>
+            </div>
+
+            <p id="recipient-line" class="recipient-line" hidden>
+              À : <span class="recipient"></span>
+            </p>
+
+            <div class="actions">
+              <button id="preview-button" class="button button-secondary" type="submit">
+                Aperçu
+              </button>
+              <button id="send-button" class="button button-primary" type="button" disabled>
+                <span class="spinner spinner-small" aria-hidden="true" hidden></span>
+                <span class="button-label">Envoyer</span>
+              </button>
+              <button id="retry-button" class="button button-primary" type="button" hidden>
+                Réessayer l'envoi
+              </button>
+            </div>
+          </footer>
+        </form>
+
+        <section class="preview-panel" aria-labelledby="preview-title">
+          <div class="preview-header">
+            <h2 id="preview-title">Aperçu de la quittance</h2>
+            <span id="preview-status" class="preview-status" data-tone="neutral">
+              <span class="preview-status-dot" aria-hidden="true"></span>
+              <span class="preview-status-label">Non généré</span>
+            </span>
+          </div>
+
+          <div
+            id="preview-pane"
+            class="preview-pane"
+            tabindex="0"
+            aria-label="Zone d'aperçu"
+            aria-busy="false"
+          >
+            <div id="preview-empty" class="pane-message">
+              <div class="empty-sheet" aria-hidden="true"></div>
+              <div class="pane-message-body">
+                <p class="pane-message-title"></p>
+                <p class="pane-message-text"></p>
+              </div>
+            </div>
+
+            <div id="preview-loading" class="pane-message" hidden>
+              <span class="spinner spinner-large" aria-hidden="true"></span>
+              <p class="pane-loading-text">Génération de l'aperçu…</p>
+            </div>
+
+            <div id="preview-failure" class="pane-failure" role="alert" hidden>
+              <span class="pane-failure-mark" aria-hidden="true">!</span>
+              <p class="pane-failure-title"></p>
+              <p class="pane-failure-text"></p>
+              <p class="pane-failure-hint">Relancez ensuite l'aperçu avec le bouton « Aperçu ».</p>
+            </div>
+
+            <div id="preview-page" class="preview-page" data-dimmed="false" hidden>
+              <iframe
+                id="preview-frame"
+                class="preview-frame"
+                title="Quittance, page A4"
+                sandbox=""
+              ></iframe>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

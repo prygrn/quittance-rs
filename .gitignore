@@ -34,3 +34,6 @@ src-tauri/gen/
 
 # PDF des mails envoyés en build debug, pour inspection
 tmp/
+
+# Rapports de test locaux
+.vitest/
