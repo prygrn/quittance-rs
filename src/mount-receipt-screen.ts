@@ -53,10 +53,6 @@ export async function mountReceiptScreen(options: {
   };
 
   const handleEdit = (): void => {
-    // Défense : le formulaire est désactivé pendant l'envoi, dont l'issue ne doit pas se perdre.
-    if (model.screenState.status === "sending") {
-      return;
-    }
     const validation = model.fieldErrors === null ? null : validateScreenForm(readValues());
     update({
       screenState: nextScreenState(model.screenState, { type: "formEdited" }),
