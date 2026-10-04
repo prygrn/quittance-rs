@@ -27,54 +27,71 @@ interface ElementLookup<T extends Element> {
  * de `index.html` ne correspond plus à ce que l'écran attend.
  */
 export function findReceiptScreenElements(root: ParentNode): ReceiptScreenElements {
-  const find = <T extends Element>(selector: string, type: new () => T): T =>
-    requireElement({ root, selector, type });
-  const byField = <T extends Element>(
-    selectorOf: (id: string) => string,
-    type: new () => T,
-  ): Record<ReceiptFormField, T> =>
-    mapFields((field) => find(selectorOf(RECEIPT_FIELD_IDS[field]), type));
+  const find = <T extends Element>(lookup: Omit<ElementLookup<T>, "root">): T =>
+    requireElement({ root, ...lookup });
+  const byField = <T extends Element>(lookup: {
+    readonly selectorOf: (id: string) => string;
+    readonly type: new () => T;
+  }): Record<ReceiptFormField, T> =>
+    mapFields((field) =>
+      find({ selector: lookup.selectorOf(RECEIPT_FIELD_IDS[field]), type: lookup.type }),
+    );
 
   return {
-    form: find("#receipt-form", HTMLFormElement),
-    formControls: find("#form-controls", HTMLFieldSetElement),
-    templateSelect: find("#template", HTMLSelectElement),
+    form: find({ selector: "#receipt-form", type: HTMLFormElement }),
+    formControls: find({ selector: "#form-controls", type: HTMLFieldSetElement }),
+    templateSelect: find({ selector: "#template", type: HTMLSelectElement }),
     fieldInputs: mapFields((field) => requireTextField({ root, id: RECEIPT_FIELD_IDS[field] })),
-    fieldErrorMessages: byField((id) => `#${id}${FIELD_ERROR_ID_SUFFIX}`, HTMLElement),
-    fieldErrorTexts: byField(
-      (id) => `#${id}${FIELD_ERROR_ID_SUFFIX} .field-error-text`,
-      HTMLElement,
-    ),
-    total: find("#total", HTMLOutputElement),
-    announcement: find("#announcement", HTMLElement),
-    errorSummary: find("#error-summary", HTMLElement),
-    errorSummaryText: find("#error-summary .banner-text", HTMLElement),
-    staleBanner: find("#stale-banner", HTMLElement),
-    sendSuccess: find("#send-success", HTMLElement),
-    sendSuccessRecipient: find("#send-success .banner-recipient", HTMLElement),
-    sendFailure: find("#send-failure", HTMLElement),
-    sendFailureTitle: find("#send-failure .banner-title", HTMLElement),
-    sendFailureText: find("#send-failure .banner-text", HTMLElement),
-    recipientLine: find("#recipient-line", HTMLElement),
-    recipient: find("#recipient-line .recipient", HTMLElement),
-    previewButton: find("#preview-button", HTMLButtonElement),
-    sendButton: find("#send-button", HTMLButtonElement),
-    sendButtonSpinner: find("#send-button .spinner", HTMLElement),
-    sendButtonLabel: find("#send-button .button-label", HTMLElement),
-    retryButton: find("#retry-button", HTMLButtonElement),
-    previewStatus: find("#preview-status", HTMLElement),
-    previewStatusLabel: find("#preview-status .preview-status-label", HTMLElement),
-    previewPane: find("#preview-pane", HTMLElement),
-    previewEmpty: find("#preview-empty", HTMLElement),
-    previewEmptyTitle: find("#preview-empty .pane-message-title", HTMLElement),
-    previewEmptyText: find("#preview-empty .pane-message-text", HTMLElement),
-    previewLoading: find("#preview-loading", HTMLElement),
-    previewFailure: find("#preview-failure", HTMLElement),
-    previewFailureTitle: find("#preview-failure .pane-failure-title", HTMLElement),
-    previewFailureText: find("#preview-failure .pane-failure-text", HTMLElement),
-    previewFailureHint: find("#preview-failure .pane-failure-hint", HTMLElement),
-    previewPage: find("#preview-page", HTMLElement),
-    previewFrame: find("#preview-frame", HTMLIFrameElement),
+    fieldErrorMessages: byField({
+      selectorOf: (id) => `#${id}${FIELD_ERROR_ID_SUFFIX}`,
+      type: HTMLElement,
+    }),
+    fieldErrorTexts: byField({
+      selectorOf: (id) => `#${id}${FIELD_ERROR_ID_SUFFIX} .field-error-text`,
+      type: HTMLElement,
+    }),
+    total: find({ selector: "#total", type: HTMLOutputElement }),
+    announcement: find({ selector: "#announcement", type: HTMLElement }),
+    errorSummary: find({ selector: "#error-summary", type: HTMLElement }),
+    errorSummaryText: find({ selector: "#error-summary .banner-text", type: HTMLElement }),
+    staleBanner: find({ selector: "#stale-banner", type: HTMLElement }),
+    sendSuccess: find({ selector: "#send-success", type: HTMLElement }),
+    sendSuccessRecipient: find({ selector: "#send-success .banner-recipient", type: HTMLElement }),
+    sendFailure: find({ selector: "#send-failure", type: HTMLElement }),
+    sendFailureTitle: find({ selector: "#send-failure .banner-title", type: HTMLElement }),
+    sendFailureText: find({ selector: "#send-failure .banner-text", type: HTMLElement }),
+    recipientLine: find({ selector: "#recipient-line", type: HTMLElement }),
+    recipient: find({ selector: "#recipient-line .recipient", type: HTMLElement }),
+    previewButton: find({ selector: "#preview-button", type: HTMLButtonElement }),
+    sendButton: find({ selector: "#send-button", type: HTMLButtonElement }),
+    sendButtonSpinner: find({ selector: "#send-button .spinner", type: HTMLElement }),
+    sendButtonLabel: find({ selector: "#send-button .button-label", type: HTMLElement }),
+    retryButton: find({ selector: "#retry-button", type: HTMLButtonElement }),
+    previewStatus: find({ selector: "#preview-status", type: HTMLElement }),
+    previewStatusLabel: find({
+      selector: "#preview-status .preview-status-label",
+      type: HTMLElement,
+    }),
+    previewPane: find({ selector: "#preview-pane", type: HTMLElement }),
+    previewEmpty: find({ selector: "#preview-empty", type: HTMLElement }),
+    previewEmptyTitle: find({ selector: "#preview-empty .pane-message-title", type: HTMLElement }),
+    previewEmptyText: find({ selector: "#preview-empty .pane-message-text", type: HTMLElement }),
+    previewLoading: find({ selector: "#preview-loading", type: HTMLElement }),
+    previewFailure: find({ selector: "#preview-failure", type: HTMLElement }),
+    previewFailureTitle: find({
+      selector: "#preview-failure .pane-failure-title",
+      type: HTMLElement,
+    }),
+    previewFailureText: find({
+      selector: "#preview-failure .pane-failure-text",
+      type: HTMLElement,
+    }),
+    previewFailureHint: find({
+      selector: "#preview-failure .pane-failure-hint",
+      type: HTMLElement,
+    }),
+    previewPage: find({ selector: "#preview-page", type: HTMLElement }),
+    previewFrame: find({ selector: "#preview-frame", type: HTMLIFrameElement }),
   };
 }
 

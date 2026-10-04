@@ -3,6 +3,7 @@ import type { CommandErrorCode } from "./api";
 import { canRequestPreview } from "./can-request-preview";
 import { COMMAND_ERROR_MESSAGES } from "./command-error-messages";
 import { isWellFormedEmail } from "./email";
+import { isPreviewPending } from "./is-preview-pending";
 import { FIELD_ERROR_MESSAGES } from "./field-error-messages";
 import { formatEuroCents } from "./format-euro-cents";
 import type { ReceiptFormField, ReceiptFormValues } from "./receipt-form";
@@ -59,7 +60,7 @@ export function renderReceiptScreen(options: {
   const { elements, model, formValues } = options;
   const { screenState } = model;
   const isSending = screenState.status === "sending";
-  const isPreviewPending = screenState.status === "previewing" && screenState.previewHtml === null;
+  const isWaitingForPreview = isPreviewPending(screenState);
   const isIdleWithoutErrors = screenState.status === "idle" && model.fieldErrors === null;
   const previewHtml = displayedPreviewHtml(screenState);
   const sendFailureCode =
@@ -70,56 +71,62 @@ export function renderReceiptScreen(options: {
   elements.formControls.disabled = isSending;
   elements.form.setAttribute("aria-busy", String(isSending));
   renderFieldErrors({ elements, model });
-  setText(elements.total, totalOf(formValues));
-  setText(elements.announcement, announcementOf(model));
+  setText({ element: elements.total, text: totalOf(formValues) });
+  setText({ element: elements.announcement, text: announcementOf(model) });
 
   const errorCount = Object.keys(model.fieldErrors ?? {}).length;
   elements.errorSummary.hidden = errorCount === 0;
-  setText(elements.errorSummaryText, errorCount === 0 ? "" : SCREEN_TEXTS.errorSummary(errorCount));
+  setText({
+    element: elements.errorSummaryText,
+    text: errorCount === 0 ? "" : SCREEN_TEXTS.errorSummary(errorCount),
+  });
   elements.staleBanner.hidden = !(isIdleWithoutErrors && model.isPreviewStale);
   elements.sendSuccess.hidden = screenState.status !== "sent";
-  setText(
-    elements.sendSuccessRecipient,
-    screenState.status === "sent" ? screenState.input.tenantEmail : "",
-  );
+  setText({
+    element: elements.sendSuccessRecipient,
+    text: screenState.status === "sent" ? screenState.input.tenantEmail : "",
+  });
   elements.sendFailure.hidden = sendFailureCode === null;
-  setText(elements.sendFailureTitle, failureTitle(sendFailureCode));
-  setText(elements.sendFailureText, failureText(sendFailureCode));
+  setText({ element: elements.sendFailureTitle, text: failureTitle(sendFailureCode) });
+  setText({ element: elements.sendFailureText, text: failureText(sendFailureCode) });
 
   const hasRecipient =
     isWellFormedEmail(recipient) &&
     (previewHtml !== null || (isIdleWithoutErrors && model.isPreviewStale)) &&
     screenState.status !== "sent";
   elements.recipientLine.hidden = !hasRecipient;
-  setText(elements.recipient, hasRecipient ? recipient : "");
+  setText({ element: elements.recipient, text: hasRecipient ? recipient : "" });
 
   elements.previewButton.disabled = !canRequestPreview(model);
-  elements.previewButton.setAttribute("aria-busy", String(isPreviewPending));
+  elements.previewButton.setAttribute("aria-busy", String(isWaitingForPreview));
   elements.sendButton.hidden = sendFailureCode !== null;
   elements.sendButton.disabled = !(screenState.status === "previewing" && previewHtml !== null);
   elements.sendButton.setAttribute("aria-busy", String(isSending));
   elements.sendButtonSpinner.hidden = !isSending;
-  setText(elements.sendButtonLabel, isSending ? SCREEN_TEXTS.SENDING : SCREEN_TEXTS.SEND);
+  setText({
+    element: elements.sendButtonLabel,
+    text: isSending ? SCREEN_TEXTS.SENDING : SCREEN_TEXTS.SEND,
+  });
   elements.retryButton.hidden = sendFailureCode === null;
 
   const status = previewStatusOf(model);
   elements.previewStatus.dataset["tone"] = status.tone;
-  setText(elements.previewStatusLabel, status.label);
+  setText({ element: elements.previewStatusLabel, text: status.label });
 
-  elements.previewPane.setAttribute("aria-busy", String(isPreviewPending));
+  elements.previewPane.setAttribute("aria-busy", String(isWaitingForPreview));
   elements.previewEmpty.hidden = !(screenState.status === "idle" && paneFailureCode === null);
-  setText(
-    elements.previewEmptyTitle,
-    model.isPreviewStale ? SCREEN_TEXTS.STALE_TITLE : SCREEN_TEXTS.EMPTY_TITLE,
-  );
-  setText(
-    elements.previewEmptyText,
-    model.isPreviewStale ? SCREEN_TEXTS.STALE_TEXT : SCREEN_TEXTS.EMPTY_TEXT,
-  );
-  elements.previewLoading.hidden = !isPreviewPending;
+  setText({
+    element: elements.previewEmptyTitle,
+    text: model.isPreviewStale ? SCREEN_TEXTS.STALE_TITLE : SCREEN_TEXTS.EMPTY_TITLE,
+  });
+  setText({
+    element: elements.previewEmptyText,
+    text: model.isPreviewStale ? SCREEN_TEXTS.STALE_TEXT : SCREEN_TEXTS.EMPTY_TEXT,
+  });
+  elements.previewLoading.hidden = !isWaitingForPreview;
   elements.previewFailure.hidden = paneFailureCode === null;
-  setText(elements.previewFailureTitle, failureTitle(paneFailureCode));
-  setText(elements.previewFailureText, failureText(paneFailureCode));
+  setText({ element: elements.previewFailureTitle, text: failureTitle(paneFailureCode) });
+  setText({ element: elements.previewFailureText, text: failureText(paneFailureCode) });
   // Sans modèle chargé, relancer l'aperçu ne sert à rien : le conseil est masqué.
   elements.previewFailureHint.hidden = model.templateLoadError !== null;
   elements.previewPage.hidden = previewHtml === null;
@@ -146,10 +153,10 @@ function renderFieldErrors(options: {
       input.setAttribute("aria-describedby", message.id);
     }
     message.hidden = error === undefined;
-    setText(
-      elements.fieldErrorTexts[field],
-      error === undefined ? "" : FIELD_ERROR_MESSAGES[error],
-    );
+    setText({
+      element: elements.fieldErrorTexts[field],
+      text: error === undefined ? "" : FIELD_ERROR_MESSAGES[error],
+    });
   });
 }
 
@@ -237,8 +244,8 @@ function failureAnnouncement(code: CommandErrorCode): string {
 }
 
 // Réécrire un texte identique ferait répéter les régions `aria-live` par certains lecteurs d'écran.
-function setText(element: HTMLElement, text: string): void {
-  if (element.textContent !== text) {
-    element.textContent = text;
+function setText(options: { readonly element: HTMLElement; readonly text: string }): void {
+  if (options.element.textContent !== options.text) {
+    options.element.textContent = options.text;
   }
 }

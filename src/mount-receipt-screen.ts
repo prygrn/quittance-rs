@@ -124,10 +124,10 @@ export async function mountReceiptScreen(options: {
       update({ templateLoadError: "template" });
       return;
     }
-    const document = elements.templateSelect.ownerDocument;
+    const ownerDocument = elements.templateSelect.ownerDocument;
     elements.templateSelect.replaceChildren(
       ...templates.map((template) => {
-        const option = document.createElement("option");
+        const option = ownerDocument.createElement("option");
         option.value = template.id;
         option.textContent = template.label;
         return option;
