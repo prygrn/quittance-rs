@@ -86,8 +86,20 @@ impl ReceiptConfig {
     /// Lit la configuration depuis une table de variables, sans accéder elle-même à
     /// l'environnement du processus. Les valeurs sont trimées ; une valeur vide est absente.
     pub fn from_variables(variables: &HashMap<String, String>) -> Result<Self, ConfigError> {
-        let _ = (variables, required_value);
-        todo!()
+        let landlord = Party::new(
+            required_value(variables, variable_names::LANDLORD_NAME)?,
+            required_value(variables, variable_names::LANDLORD_ADDRESS)?,
+            required_value(variables, variable_names::LANDLORD_EMAIL)?,
+        )
+        .map_err(ConfigError::InvalidLandlord)?;
+        Ok(Self {
+            landlord,
+            issue_place: required_value(variables, variable_names::LANDLORD_CITY)?.to_owned(),
+            signature_path: PathBuf::from(required_value(
+                variables,
+                variable_names::SIGNATURE_PATH,
+            )?),
+        })
     }
 
     /// Bailleur, émetteur de la quittance et destinataire de sa copie cachée.
@@ -115,8 +127,10 @@ pub struct DeliveryConfig {
 impl DeliveryConfig {
     /// Mêmes règles de lecture que [`ReceiptConfig::from_variables`].
     pub fn from_variables(variables: &HashMap<String, String>) -> Result<Self, ConfigError> {
-        let _ = variables;
-        todo!()
+        Ok(Self {
+            chrome_path: PathBuf::from(required_value(variables, variable_names::CHROME_PATH)?),
+            smtp: SmtpConfig::from_variables(variables).map_err(ConfigError::InvalidSmtp)?,
+        })
     }
 
     pub fn chrome_path(&self) -> &Path {

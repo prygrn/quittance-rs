@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::app_config::ConfigError;
@@ -27,8 +28,14 @@ impl EnvFileConfigSource {
 
     /// Fichier `.env` du dossier de l'exécutable.
     pub fn next_to_executable() -> Result<Self, ConfigError> {
-        let _ = ENV_FILE_NAME;
-        todo!()
+        let executable = std::env::current_exe().map_err(ConfigError::UnknownExecutableLocation)?;
+        let directory = executable.parent().ok_or_else(|| {
+            ConfigError::UnknownExecutableLocation(io::Error::other(format!(
+                "executable path `{}` has no parent directory",
+                executable.display()
+            )))
+        })?;
+        Ok(Self::new(directory.join(ENV_FILE_NAME)))
     }
 
     pub fn env_file(&self) -> &Path {
@@ -41,7 +48,25 @@ impl ConfigSource for EnvFileConfigSource {
     /// variable dont le nom ou la valeur n'est pas en UTF-8 est ignorée : elle ne peut pas
     /// appartenir à la configuration.
     fn variables(&self) -> Result<HashMap<String, String>, ConfigError> {
-        todo!()
+        let mut variables = self.env_file_variables()?;
+        variables.extend(std::env::vars_os().filter_map(|(name, value)| {
+            Some((name.into_string().ok()?, value.into_string().ok()?))
+        }));
+        Ok(variables)
+    }
+}
+
+impl EnvFileConfigSource {
+    fn env_file_variables(&self) -> Result<HashMap<String, String>, ConfigError> {
+        let unreadable = |source| ConfigError::UnreadableEnvFile {
+            path: self.env_file().to_owned(),
+            source,
+        };
+        match dotenvy::from_path_iter(self.env_file()) {
+            Ok(entries) => entries.collect::<Result<_, _>>().map_err(unreadable),
+            Err(error) if error.not_found() => Ok(HashMap::new()),
+            Err(error) => Err(unreadable(error)),
+        }
     }
 }
 

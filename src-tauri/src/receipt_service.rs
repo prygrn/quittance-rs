@@ -35,14 +35,9 @@ impl ReceiptService<'_> {
         input: ReceiptInputPayload,
         issue_date: String,
     ) -> Result<String, CommandError> {
-        let _ = (
-            template_id,
-            input,
-            issue_date,
-            self.config_source,
-            Self::render,
-        );
-        todo!()
+        let variables = self.config_source.variables()?;
+        let config = ReceiptConfig::from_variables(&variables)?;
+        Ok(self.render(&config, template_id, input, issue_date)?.html)
     }
 
     /// Régénère la quittance, l'imprime en PDF et l'envoie au locataire, avec copie cachée
@@ -53,14 +48,28 @@ impl ReceiptService<'_> {
         input: ReceiptInputPayload,
         issue_date: String,
     ) -> Result<(), CommandError> {
-        let _ = (template_id, input, issue_date);
-        let _ = (self.delivery, self.sent_pdf_archive);
-        let _ = (
-            DeliveryConfig::from_variables,
-            build_receipt_email,
-            CommandErrorCode::Unknown,
-        );
-        todo!()
+        let variables = self.config_source.variables()?;
+        let receipt_config = ReceiptConfig::from_variables(&variables)?;
+        let delivery_config = DeliveryConfig::from_variables(&variables)?;
+        let rendered = self.render(&receipt_config, template_id, input, issue_date)?;
+        let pdf_renderer = self.delivery.pdf_renderer(delivery_config.chrome_path())?;
+        let mailer = self.delivery.mailer(delivery_config.smtp())?;
+        let pdf = pdf_renderer.render(&rendered.html)?;
+        let email = build_receipt_email(&rendered.receipt, pdf)?;
+        let attachment = email.attachment();
+        self.sent_pdf_archive
+            .store(attachment.file_name(), attachment.content())
+            .map_err(|error| {
+                CommandError::new(
+                    CommandErrorCode::Unknown,
+                    format!(
+                        "sent PDF `{}` could not be archived: {error}",
+                        attachment.file_name()
+                    ),
+                )
+            })?;
+        mailer.send(&email)?;
+        Ok(())
     }
 
     fn render(
