@@ -9,7 +9,7 @@ use quittance_template::TemplateError;
 use serde::{Serialize, Serializer};
 
 use crate::app_config::ConfigError;
-use crate::receipt_input_payload::ReceiptInputError;
+use crate::iso_date::InvalidIsoDate;
 
 /// Source d'échec d'une commande, miroir exact de `CommandErrorCode` dans `src/api.ts`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,8 +79,8 @@ impl fmt::Display for CommandError {
     }
 }
 
-impl From<ReceiptInputError> for CommandError {
-    fn from(error: ReceiptInputError) -> Self {
+impl From<InvalidIsoDate> for CommandError {
+    fn from(error: InvalidIsoDate) -> Self {
         Self::from_error(CommandErrorCode::Validation, &error)
     }
 }
@@ -195,8 +195,8 @@ mod tests {
     }
 
     #[test]
-    fn given_receipt_input_error_when_converting_then_code_is_validation() {
-        let error = ReceiptInputError::InvalidIsoDate {
+    fn given_invalid_iso_date_when_converting_then_code_is_validation() {
+        let error = InvalidIsoDate {
             field: "periodStart",
             value: "01/10/2026".to_owned(),
         };
@@ -236,6 +236,11 @@ mod tests {
             ConfigError::MissingVariable("LANDLORD_CITY"),
             ConfigError::InvalidLandlord(PartyError::InvalidEmail("paul".to_owned())),
             ConfigError::InvalidSmtp(MailError::InvalidPort("smtp".to_owned())),
+            ConfigError::UnknownExecutableLocation(io::Error::from(io::ErrorKind::NotFound)),
+            ConfigError::UnreadableEnvFile {
+                path: PathBuf::from("/opt/quittance/.env"),
+                source: dotenvy::Error::LineParse("LANDLORD_CITY='Lyon".to_owned(), 14),
+            },
         ];
 
         for error in errors {
@@ -250,6 +255,16 @@ mod tests {
         let command_error = CommandError::from(ConfigError::MissingVariable("LANDLORD_CITY"));
 
         assert!(command_error.message().contains("LANDLORD_CITY"));
+    }
+
+    #[test]
+    fn given_unreadable_env_file_when_converting_then_message_names_the_file() {
+        let command_error = CommandError::from(ConfigError::UnreadableEnvFile {
+            path: PathBuf::from("/opt/quittance/.env"),
+            source: dotenvy::Error::LineParse("LANDLORD_CITY='Lyon".to_owned(), 14),
+        });
+
+        assert!(command_error.message().contains("/opt/quittance/.env"));
     }
 
     #[test]

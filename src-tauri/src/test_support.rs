@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process;
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use quittance_core::Date;
 use quittance_mailer::{MailError, Mailer, ReceiptEmail, SmtpConfig};
@@ -12,7 +14,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tauri::ipc::{InvokeResponseBody, IpcResponse};
 
-use crate::clock::Clock;
+use crate::app_config::ConfigError;
 use crate::config_source::ConfigSource;
 use crate::delivery_factory::DeliveryFactory;
 use crate::receipt_input_payload::ReceiptInputPayload;
@@ -77,22 +79,31 @@ pub(crate) fn sample_payload() -> ReceiptInputPayload {
     }
 }
 
-/// Configuration fournie par une table fixe.
-pub(crate) struct FakeConfigSource(pub HashMap<String, String>);
+/// Configuration fournie par une table fixe, ou échec de lecture programmé.
+pub(crate) struct FakeConfigSource {
+    pub variables: HashMap<String, String>,
+    pub failure: Option<fn() -> ConfigError>,
+}
 
 impl ConfigSource for FakeConfigSource {
-    fn variables(&self) -> HashMap<String, String> {
-        self.0.clone()
+    fn variables(&self) -> Result<HashMap<String, String>, ConfigError> {
+        match self.failure {
+            Some(failure) => Err(failure()),
+            None => Ok(self.variables.clone()),
+        }
     }
 }
 
-/// Horloge arrêtée sur une date.
-pub(crate) struct FixedClock(pub Date);
-
-impl Clock for FixedClock {
-    fn today(&self) -> Date {
-        self.0
-    }
+/// Chemin propre à un test dans le dossier temporaire du système, absent au départ.
+pub(crate) fn unique_temp_path(test_name: &str) -> PathBuf {
+    let nanoseconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "quittance-app-{test_name}-{}-{nanoseconds}",
+        process::id()
+    ))
 }
 
 /// Étapes observées par les fakes, dans l'ordre où elles ont eu lieu.

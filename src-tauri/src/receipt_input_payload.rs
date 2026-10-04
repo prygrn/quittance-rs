@@ -1,10 +1,7 @@
-use std::error::Error;
-use std::fmt;
-
-use quittance_core::{Date, ReceiptInput};
+use quittance_core::ReceiptInput;
 use serde::Deserialize;
 
-use crate::iso_date::parse_iso_date;
+use crate::iso_date::{InvalidIsoDate, parse_iso_date_field};
 
 /// Saisie de quittance telle que l'UI l'envoie (`ReceiptInput` de `src/api.ts`) :
 /// champs en camelCase, dates ISO `YYYY-MM-DD`, montants en centimes entiers.
@@ -24,33 +21,13 @@ pub struct ReceiptInputPayload {
     pub payment_date: String,
 }
 
-/// Saisie dont une date n'est pas au format ISO ou n'existe pas.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReceiptInputError {
-    /// `field` porte le nom du champ côté UI, en camelCase.
-    InvalidIsoDate { field: &'static str, value: String },
-}
-
-impl fmt::Display for ReceiptInputError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidIsoDate { field, value } => write!(
-                formatter,
-                "field `{field}` value `{value}` is not an existing YYYY-MM-DD date"
-            ),
-        }
-    }
-}
-
-impl Error for ReceiptInputError {}
-
 impl ReceiptInputPayload {
     /// Convertit la saisie en `ReceiptInput` typé, que `quittance-core` valide ensuite.
-    pub fn into_receipt_input(self) -> Result<ReceiptInput, ReceiptInputError> {
+    pub fn into_receipt_input(self) -> Result<ReceiptInput, InvalidIsoDate> {
         Ok(ReceiptInput {
-            period_start: parsed_date("periodStart", self.period_start)?,
-            period_end: parsed_date("periodEnd", self.period_end)?,
-            payment_date: parsed_date("paymentDate", self.payment_date)?,
+            period_start: parse_iso_date_field("periodStart", self.period_start)?,
+            period_end: parse_iso_date_field("periodEnd", self.period_end)?,
+            payment_date: parse_iso_date_field("paymentDate", self.payment_date)?,
             tenant_name: self.tenant_name,
             tenant_address: self.tenant_address,
             tenant_email: self.tenant_email,
@@ -59,10 +36,6 @@ impl ReceiptInputPayload {
             charges_cents: self.charges_cents,
         })
     }
-}
-
-fn parsed_date(field: &'static str, value: String) -> Result<Date, ReceiptInputError> {
-    parse_iso_date(&value).ok_or(ReceiptInputError::InvalidIsoDate { field, value })
 }
 
 #[cfg(test)]
@@ -168,7 +141,7 @@ mod tests {
             let result = payload.into_receipt_input();
 
             assert!(
-                matches!(result, Err(ReceiptInputError::InvalidIsoDate { field, .. }) if field == expected_field),
+                matches!(result, Err(InvalidIsoDate { field, .. }) if field == expected_field),
                 "{expected_field} should be reported, got {result:?}"
             );
         }

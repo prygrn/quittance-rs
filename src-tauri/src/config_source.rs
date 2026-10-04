@@ -1,35 +1,149 @@
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use crate::app_config::ConfigError;
+
+/// Nom du fichier de configuration, placé à côté de l'exécutable.
+const ENV_FILE_NAME: &str = ".env";
 
 /// Provenance des variables de configuration, derrière un trait pour tester les commandes
 /// sans toucher à l'environnement réel du processus.
 pub trait ConfigSource {
-    fn variables(&self) -> HashMap<String, String>;
+    fn variables(&self) -> Result<HashMap<String, String>, ConfigError>;
 }
 
-/// Variables d'environnement du processus.
-pub struct EnvironmentConfigSource;
+/// Variables d'un fichier `.env`, complétées par l'environnement du processus, qui prime :
+/// une variable exportée au lancement remplace celle du fichier.
+pub struct EnvFileConfigSource {
+    env_file: PathBuf,
+}
 
-impl ConfigSource for EnvironmentConfigSource {
-    /// Une variable dont le nom ou la valeur n'est pas en UTF-8 est ignorée : elle ne peut
-    /// pas appartenir à la configuration.
-    fn variables(&self) -> HashMap<String, String> {
-        std::env::vars_os()
-            .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
-            .collect()
+impl EnvFileConfigSource {
+    pub fn new(env_file: impl Into<PathBuf>) -> Self {
+        Self {
+            env_file: env_file.into(),
+        }
+    }
+
+    /// Fichier `.env` du dossier de l'exécutable.
+    pub fn next_to_executable() -> Result<Self, ConfigError> {
+        let _ = ENV_FILE_NAME;
+        todo!()
+    }
+
+    pub fn env_file(&self) -> &Path {
+        &self.env_file
+    }
+}
+
+impl ConfigSource for EnvFileConfigSource {
+    /// Un fichier absent n'est pas une erreur : seules manqueront ses variables. Une
+    /// variable dont le nom ou la valeur n'est pas en UTF-8 est ignorée : elle ne peut pas
+    /// appartenir à la configuration.
+    fn variables(&self) -> Result<HashMap<String, String>, ConfigError> {
+        todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
+    use crate::test_support::unique_temp_path;
+
+    /// Variable propre à ces tests, absente de l'environnement du processus.
+    const FILE_ONLY_VARIABLE: &str = "QUITTANCE_APP_TEST_FILE_ONLY_VARIABLE";
+
+    fn env_file_with(test_name: &str, content: &str) -> PathBuf {
+        let path = unique_temp_path(test_name);
+        fs::write(&path, content).unwrap();
+        path
+    }
 
     #[test]
-    fn given_process_environment_when_reading_variables_then_variables_set_by_cargo_are_present() {
-        let variables = EnvironmentConfigSource.variables();
+    fn given_env_file_when_reading_variables_then_its_variables_are_present() {
+        let env_file = env_file_with("env-file", &format!("{FILE_ONLY_VARIABLE}=\"Lyon\"\n"));
+
+        let variables = EnvFileConfigSource::new(&env_file).variables().unwrap();
+
+        assert_eq!(
+            variables.get(FILE_ONLY_VARIABLE).map(String::as_str),
+            Some("Lyon")
+        );
+        fs::remove_file(env_file).unwrap();
+    }
+
+    #[test]
+    fn given_env_file_when_reading_variables_then_process_variables_are_present_too() {
+        let env_file = env_file_with("env-file-and-process", &format!("{FILE_ONLY_VARIABLE}=1\n"));
+
+        let variables = EnvFileConfigSource::new(&env_file).variables().unwrap();
 
         assert_eq!(
             variables.get("CARGO_PKG_NAME").map(String::as_str),
             Some(env!("CARGO_PKG_NAME"))
         );
+        fs::remove_file(env_file).unwrap();
+    }
+
+    #[test]
+    fn given_variable_in_both_file_and_process_when_reading_variables_then_process_value_wins() {
+        let env_file = env_file_with("env-file-overridden", "CARGO_PKG_NAME=from-env-file\n");
+
+        let variables = EnvFileConfigSource::new(&env_file).variables().unwrap();
+
+        assert_eq!(
+            variables.get("CARGO_PKG_NAME").map(String::as_str),
+            Some(env!("CARGO_PKG_NAME"))
+        );
+        fs::remove_file(env_file).unwrap();
+    }
+
+    #[test]
+    fn given_missing_env_file_when_reading_variables_then_process_variables_are_returned() {
+        let missing_env_file = unique_temp_path("missing-env-file");
+
+        let variables = EnvFileConfigSource::new(missing_env_file)
+            .variables()
+            .unwrap();
+
+        assert_eq!(
+            variables.get("CARGO_PKG_NAME").map(String::as_str),
+            Some(env!("CARGO_PKG_NAME"))
+        );
+        assert!(!variables.contains_key(FILE_ONLY_VARIABLE));
+    }
+
+    #[test]
+    fn given_malformed_env_file_when_reading_variables_then_env_file_is_unreadable() {
+        let env_file = env_file_with("malformed-env-file", "LANDLORD_CITY='Lyon\n");
+
+        let result = EnvFileConfigSource::new(&env_file).variables();
+
+        assert!(
+            matches!(&result, Err(ConfigError::UnreadableEnvFile { path, .. }) if path == &env_file),
+            "got {result:?}"
+        );
+        fs::remove_file(env_file).unwrap();
+    }
+
+    #[test]
+    fn given_env_file_path_that_is_a_directory_when_reading_variables_then_env_file_is_unreadable()
+    {
+        let directory = Path::new(env!("CARGO_MANIFEST_DIR"));
+
+        let result = EnvFileConfigSource::new(directory).variables();
+
+        assert!(matches!(result, Err(ConfigError::UnreadableEnvFile { .. })));
+    }
+
+    #[test]
+    fn given_running_executable_when_locating_env_file_then_it_sits_next_to_the_executable() {
+        let executable = std::env::current_exe().unwrap();
+
+        let source = EnvFileConfigSource::next_to_executable().unwrap();
+
+        assert_eq!(source.env_file(), executable.parent().unwrap().join(".env"));
     }
 }

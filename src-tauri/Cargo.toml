@@ -15,6 +15,7 @@ workspace = true
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
+dotenvy = "0.15.7"
 quittance-core = { path = "../crates/quittance-core" }
 quittance-mailer = { path = "../crates/quittance-mailer" }
 quittance-pdf = { path = "../crates/quittance-pdf" }

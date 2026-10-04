@@ -3,11 +3,11 @@ use quittance_mailer::build_receipt_email;
 use quittance_signature::load_signature;
 use quittance_template::{IssueDetails, render_html};
 
-use crate::app_config::AppConfig;
-use crate::clock::Clock;
+use crate::app_config::{DeliveryConfig, ReceiptConfig};
 use crate::command_error::{CommandError, CommandErrorCode};
 use crate::config_source::ConfigSource;
 use crate::delivery_factory::DeliveryFactory;
+use crate::iso_date::parse_iso_date_field;
 use crate::receipt_input_payload::ReceiptInputPayload;
 use crate::sent_pdf_archive::SentPdfArchive;
 
@@ -15,7 +15,6 @@ use crate::sent_pdf_archive::SentPdfArchive;
 /// pour qu'une configuration absente ou invalide soit signalée à l'UI par le code `config`.
 pub struct ReceiptService<'a> {
     pub config_source: &'a dyn ConfigSource,
-    pub clock: &'a dyn Clock,
     pub delivery: &'a dyn DeliveryFactory,
     pub sent_pdf_archive: &'a dyn SentPdfArchive,
 }
@@ -28,56 +27,55 @@ struct RenderedReceipt {
 
 impl ReceiptService<'_> {
     /// HTML complet de la quittance, signature protégée comprise, tel qu'il sera imprimé.
+    /// `issue_date` (ISO `YYYY-MM-DD`) est la date locale de l'UI, portée par la mention
+    /// « Fait à …, le … ». Seule la configuration de la quittance est exigée.
     pub fn preview(
         &self,
         template_id: &str,
         input: ReceiptInputPayload,
+        issue_date: String,
     ) -> Result<String, CommandError> {
-        let config = self.load_config()?;
-        Ok(self.render(&config, template_id, input)?.html)
+        let _ = (
+            template_id,
+            input,
+            issue_date,
+            self.config_source,
+            Self::render,
+        );
+        todo!()
     }
 
     /// Régénère la quittance, l'imprime en PDF et l'envoie au locataire, avec copie cachée
     /// au bailleur. Le PDF est archivé avant l'envoi : un échec d'archivage n'envoie rien.
-    pub fn send(&self, template_id: &str, input: ReceiptInputPayload) -> Result<(), CommandError> {
-        let config = self.load_config()?;
-        let rendered = self.render(&config, template_id, input)?;
-        let pdf_renderer = self.delivery.pdf_renderer(config.chrome_path())?;
-        let mailer = self.delivery.mailer(config.smtp())?;
-        let pdf = pdf_renderer.render(&rendered.html)?;
-        let email = build_receipt_email(&rendered.receipt, pdf)?;
-        let attachment = email.attachment();
-        self.sent_pdf_archive
-            .store(attachment.file_name(), attachment.content())
-            .map_err(|error| {
-                CommandError::new(
-                    CommandErrorCode::Unknown,
-                    format!(
-                        "sent PDF `{}` could not be archived: {error}",
-                        attachment.file_name()
-                    ),
-                )
-            })?;
-        mailer.send(&email)?;
-        Ok(())
-    }
-
-    fn load_config(&self) -> Result<AppConfig, CommandError> {
-        Ok(AppConfig::from_variables(&self.config_source.variables())?)
+    pub fn send(
+        &self,
+        template_id: &str,
+        input: ReceiptInputPayload,
+        issue_date: String,
+    ) -> Result<(), CommandError> {
+        let _ = (template_id, input, issue_date);
+        let _ = (self.delivery, self.sent_pdf_archive);
+        let _ = (
+            DeliveryConfig::from_variables,
+            build_receipt_email,
+            CommandErrorCode::Unknown,
+        );
+        todo!()
     }
 
     fn render(
         &self,
-        config: &AppConfig,
+        config: &ReceiptConfig,
         template_id: &str,
         input: ReceiptInputPayload,
+        issue_date: String,
     ) -> Result<RenderedReceipt, CommandError> {
         let receipt = validate_receipt(config.landlord().clone(), input.into_receipt_input()?)?;
-        let signature = load_signature(config.signature_path())?.protect_for_receipt(&receipt);
         let issue = IssueDetails {
             place: config.issue_place().to_owned(),
-            date: self.clock.today(),
+            date: parse_iso_date_field("issueDate", issue_date)?,
         };
+        let signature = load_signature(config.signature_path())?.protect_for_receipt(&receipt);
         let html = render_html(template_id, &receipt, &issue, Some(signature.data_uri()))?;
         Ok(RenderedReceipt { receipt, html })
     }
@@ -95,18 +93,24 @@ mod tests {
     use quittance_template::{IssueDetails, render_html};
 
     use super::*;
-    use crate::command_error::CommandErrorCode;
+    use crate::app_config::ConfigError;
     use crate::test_support::{
         CHROME_PATH, DeliveryEvent, FAKE_PDF, FakeConfigSource, FakeDelivery, FakePdfArchive,
-        FixedClock, STANDARD_TEMPLATE_ID, complete_variables, date, sample_payload,
+        STANDARD_TEMPLATE_ID, complete_variables, date, sample_payload,
     };
 
     /// Lendemain du paiement : distinct de toutes les dates de la saisie.
-    const ISSUE_DAY: u8 = 6;
+    const ISSUE_DATE: &str = "2026-10-06";
+    const DELIVERY_VARIABLES: [&str; 5] = [
+        "CHROME_PATH",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+    ];
 
     struct Harness {
         config_source: FakeConfigSource,
-        clock: FixedClock,
         delivery: FakeDelivery,
         archive_failure: Option<fn() -> io::Error>,
     }
@@ -114,8 +118,10 @@ mod tests {
     impl Harness {
         fn new() -> Self {
             Self {
-                config_source: FakeConfigSource(complete_variables()),
-                clock: FixedClock(date(2026, 10, ISSUE_DAY)),
+                config_source: FakeConfigSource {
+                    variables: complete_variables(),
+                    failure: None,
+                },
                 delivery: FakeDelivery::default(),
                 archive_failure: None,
             }
@@ -123,22 +129,22 @@ mod tests {
 
         fn with_variable(mut self, name: &str, value: &str) -> Self {
             self.config_source
-                .0
+                .variables
                 .insert(name.to_owned(), value.to_owned());
             self
         }
 
         fn without_variable(mut self, name: &str) -> Self {
-            self.config_source.0.remove(name);
+            self.config_source.variables.remove(name);
             self
         }
 
         fn preview(&self, input: ReceiptInputPayload) -> Result<String, CommandError> {
-            self.run(|service| service.preview(STANDARD_TEMPLATE_ID, input))
+            self.run(|service| service.preview(STANDARD_TEMPLATE_ID, input, ISSUE_DATE.to_owned()))
         }
 
         fn send(&self, input: ReceiptInputPayload) -> Result<(), CommandError> {
-            self.run(|service| service.send(STANDARD_TEMPLATE_ID, input))
+            self.run(|service| service.send(STANDARD_TEMPLATE_ID, input, ISSUE_DATE.to_owned()))
         }
 
         fn run<T>(&self, action: impl FnOnce(&ReceiptService) -> T) -> T {
@@ -148,7 +154,6 @@ mod tests {
             };
             action(&ReceiptService {
                 config_source: &self.config_source,
-                clock: &self.clock,
                 delivery: &self.delivery,
                 sent_pdf_archive: &archive,
             })
@@ -184,7 +189,7 @@ mod tests {
             .protect_for_receipt(&receipt);
         let issue = IssueDetails {
             place: "Lyon".to_owned(),
-            date: date(2026, 10, ISSUE_DAY),
+            date: date(2026, 10, 6),
         };
         render_html(
             STANDARD_TEMPLATE_ID,
@@ -205,7 +210,8 @@ mod tests {
     // Aperçu
 
     #[test]
-    fn given_valid_input_when_previewing_then_html_is_the_receipt_issued_today_in_landlord_city() {
+    fn given_valid_input_when_previewing_then_html_is_the_receipt_issued_on_ui_date_in_landlord_city()
+     {
         let harness = Harness::new();
 
         let html = harness.preview(sample_payload()).unwrap();
@@ -276,9 +282,67 @@ mod tests {
     fn given_unknown_template_when_previewing_then_code_is_template() {
         let harness = Harness::new();
 
-        let result = harness.run(|service| service.preview("fancy", sample_payload()));
+        let result = harness
+            .run(|service| service.preview("fancy", sample_payload(), ISSUE_DATE.to_owned()));
 
         assert_code(result, CommandErrorCode::Template);
+    }
+
+    #[test]
+    fn given_issue_date_from_ui_when_previewing_then_mention_carries_that_date() {
+        let harness = Harness::new();
+
+        let html = harness
+            .run(|service| {
+                service.preview(
+                    STANDARD_TEMPLATE_ID,
+                    sample_payload(),
+                    "2026-11-02".to_owned(),
+                )
+            })
+            .unwrap();
+
+        assert!(html.contains("02/11/2026"));
+        assert!(!html.contains("06/10/2026"));
+    }
+
+    #[test]
+    fn given_malformed_issue_date_when_previewing_then_code_is_validation() {
+        let harness = Harness::new();
+
+        let result = harness.run(|service| {
+            service.preview(
+                STANDARD_TEMPLATE_ID,
+                sample_payload(),
+                "06/10/2026".to_owned(),
+            )
+        });
+
+        assert_code(result, CommandErrorCode::Validation);
+    }
+
+    #[test]
+    fn given_no_chrome_nor_smtp_configuration_when_previewing_then_preview_is_rendered() {
+        let harness = DELIVERY_VARIABLES
+            .into_iter()
+            .fold(Harness::new(), |harness, name| {
+                harness.without_variable(name)
+            });
+
+        let html = harness.preview(sample_payload()).unwrap();
+
+        assert_eq!(html, expected_html());
+    }
+
+    #[test]
+    fn given_unreadable_configuration_source_when_previewing_then_code_is_config() {
+        let mut harness = Harness::new();
+        harness.config_source.failure = Some(|| ConfigError::UnreadableEnvFile {
+            path: PathBuf::from("/opt/quittance/.env"),
+            source: dotenvy::Error::LineParse("LANDLORD_CITY='Lyon".to_owned(), 14),
+        });
+
+        assert_code(harness.preview(sample_payload()), CommandErrorCode::Config);
     }
 
     // Envoi
@@ -365,6 +429,32 @@ mod tests {
         let harness = Harness::new().without_variable("SMTP_HOST");
 
         assert_code(harness.send(sample_payload()), CommandErrorCode::Config);
+        assert_eq!(harness.events(), []);
+    }
+
+    #[test]
+    fn given_each_missing_delivery_variable_when_sending_then_code_is_config_and_nothing_happens() {
+        for name in DELIVERY_VARIABLES {
+            let harness = Harness::new().without_variable(name);
+
+            assert_code(harness.send(sample_payload()), CommandErrorCode::Config);
+            assert_eq!(harness.events(), [], "without {name}");
+        }
+    }
+
+    #[test]
+    fn given_malformed_issue_date_when_sending_then_code_is_validation_and_nothing_happens() {
+        let harness = Harness::new();
+
+        let result = harness.run(|service| {
+            service.send(
+                STANDARD_TEMPLATE_ID,
+                sample_payload(),
+                "2026-10-32".to_owned(),
+            )
+        });
+
+        assert_code(result, CommandErrorCode::Validation);
         assert_eq!(harness.events(), []);
     }
 
@@ -458,7 +548,8 @@ mod tests {
     fn given_unknown_template_when_sending_then_code_is_template_and_nothing_is_rendered() {
         let harness = Harness::new();
 
-        let result = harness.run(|service| service.send("fancy", sample_payload()));
+        let result =
+            harness.run(|service| service.send("fancy", sample_payload(), ISSUE_DATE.to_owned()));
 
         assert_code(result, CommandErrorCode::Template);
         assert!(

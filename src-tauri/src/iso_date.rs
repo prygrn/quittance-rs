@@ -1,4 +1,32 @@
+use std::error::Error;
+use std::fmt;
+
 use quittance_core::Date;
+
+/// Champ dont la valeur n'est pas une date ISO existante.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvalidIsoDate {
+    /// Nom du champ ou de l'argument côté UI, en camelCase.
+    pub field: &'static str,
+    pub value: String,
+}
+
+impl fmt::Display for InvalidIsoDate {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "field `{}` value `{}` is not an existing YYYY-MM-DD date",
+            self.field, self.value
+        )
+    }
+}
+
+impl Error for InvalidIsoDate {}
+
+/// Lit la date ISO d'un champ reçu de l'UI ; l'erreur nomme le champ et sa valeur.
+pub fn parse_iso_date_field(field: &'static str, value: String) -> Result<Date, InvalidIsoDate> {
+    parse_iso_date(&value).ok_or(InvalidIsoDate { field, value })
+}
 
 /// Lit une date au format ISO `YYYY-MM-DD`, celui d'un `<input type="date">`.
 /// Renvoie `None` pour toute autre forme ou pour une date inexistante.
@@ -34,6 +62,39 @@ mod iso_layout {
 mod tests {
     use super::*;
     use crate::test_support::date;
+
+    #[test]
+    fn given_valid_field_value_when_parsing_field_then_date_is_read() {
+        let parsed = parse_iso_date_field("issueDate", "2026-10-06".to_owned());
+
+        assert_eq!(parsed, Ok(date(2026, 10, 6)));
+    }
+
+    #[test]
+    fn given_invalid_field_value_when_parsing_field_then_error_names_field_and_value() {
+        let parsed = parse_iso_date_field("issueDate", "06/10/2026".to_owned());
+
+        assert_eq!(
+            parsed,
+            Err(InvalidIsoDate {
+                field: "issueDate",
+                value: "06/10/2026".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn given_invalid_iso_date_when_displaying_then_field_and_value_appear() {
+        let error = InvalidIsoDate {
+            field: "issueDate",
+            value: "06/10/2026".to_owned(),
+        };
+
+        let displayed = error.to_string();
+
+        assert!(displayed.contains("issueDate"));
+        assert!(displayed.contains("06/10/2026"));
+    }
 
     #[test]
     fn given_iso_date_when_parsing_then_calendar_date_is_read() {

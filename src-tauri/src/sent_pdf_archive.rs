@@ -59,23 +59,11 @@ pub fn sent_pdf_archive_for_build() -> Box<dyn SentPdfArchive> {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use std::process;
 
     use super::*;
+    use crate::test_support::unique_temp_path;
 
     const PDF_CONTENT: &[u8] = b"%PDF-1.7 quittance";
-
-    /// Dossier propre au test, absent au départ.
-    fn unique_test_directory(test_name: &str) -> PathBuf {
-        let nanoseconds = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "quittance-app-{test_name}-{}-{nanoseconds}",
-            process::id()
-        ))
-    }
 
     fn stored_files(directory: &Path) -> Vec<PathBuf> {
         fs::read_dir(directory)
@@ -86,7 +74,7 @@ mod tests {
 
     #[test]
     fn given_missing_directory_when_storing_pdf_then_directory_is_created_with_the_pdf() {
-        let directory = unique_test_directory("store");
+        let directory = unique_temp_path("store");
         let archive = DirectoryPdfArchive::new(&directory);
 
         archive.store("quittance-2026-10.pdf", PDF_CONTENT).unwrap();
@@ -101,7 +89,7 @@ mod tests {
 
     #[test]
     fn given_two_pdfs_of_the_same_period_when_storing_then_both_are_kept() {
-        let directory = unique_test_directory("store-twice");
+        let directory = unique_temp_path("store-twice");
         let archive = DirectoryPdfArchive::new(&directory);
 
         archive.store("quittance-2026-10.pdf", PDF_CONTENT).unwrap();
