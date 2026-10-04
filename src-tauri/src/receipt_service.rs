@@ -169,7 +169,8 @@ mod tests {
 
         let html = harness.preview(sample_payload()).unwrap();
 
-        assert!(html.contains("data:image/png;base64,"));
+        // Le template échappe la barre oblique de l'attribut `src` en `&#x2f;`.
+        assert!(html.contains("src=\"data:image&#x2f;png;base64,"));
     }
 
     #[test]
