@@ -1,10 +1,9 @@
 # Point d'entrée unique des commandes de développement, partagé par le hook git et la CI.
-.PHONY: setup format fmt-check lint quality build-debug test-unit build-release test-integration test-e2e ci msrv-version msrv-check
+.PHONY: setup format fmt-check lint quality build-debug test-unit test build-release test-integration test-e2e ci msrv-version msrv-check
 
 setup:
 	npm ci
 	git config core.hooksPath .githooks
-	ln -sfn ../../rules/project .agents/rules/project
 
 format:
 	cargo fmt --all
@@ -21,6 +20,7 @@ lint:
 	npx tsc --noEmit
 
 quality: fmt-check lint
+	.agents/scripts/compile-agents --check
 
 build-debug:
 	cargo build --workspace
@@ -28,6 +28,8 @@ build-debug:
 test-unit:
 	cargo test --workspace --lib --bins
 	npx vitest run --passWithNoTests
+
+test: test-unit
 
 build-release:
 	cargo build --workspace --release

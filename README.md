@@ -60,7 +60,7 @@ Prérequis : Rust stable, Node ≥ 22.12, Chromium ou Chrome, Docker (Mailpit po
 
 ```bash
 git submodule update --init
-make setup        # dépendances npm, hooks git, lien des règles projet
+make setup        # dépendances npm, hooks git (.githooks)
 ```
 
 | Commande                | Effet                                                           |
@@ -68,6 +68,7 @@ make setup        # dépendances npm, hooks git, lien des règles projet
 | `make format`           | Formate et corrige automatiquement (rustfmt, prettier, eslint)  |
 | `make quality`          | Vérifie format et lint (rustfmt, clippy, prettier, eslint, tsc) |
 | `make test-unit`        | Tests unitaires Rust et TS                                      |
+| `make test`             | Alias de `make test-unit`, appelé par le hook du kernel         |
 | `make test-integration` | Tests d'intégration (Chromium, Mailpit)                         |
 | `make test-e2e`         | Tests end-to-end de l'app                                       |
 | `make msrv-check`       | Compile avec le `rust-version` du `Cargo.toml` (rustup requis)  |
@@ -75,7 +76,11 @@ make setup        # dépendances npm, hooks git, lien des règles projet
 
 ### Workflow test-first
 
-Pour chaque feature : API publique en stubs et suite complète de tests unitaires d'abord (commit `test(<scope>): ...`, tests rouges), puis implémentation jusqu'au vert (commit `feat(<scope>): ...`). Le hook `commit-msg` vérifie le format du message, bloque sur le lint et sur les tests, sauf pour un commit de type `test`.
+Pour chaque feature : API publique en stubs et suite complète de tests unitaires d'abord (commit `test(<scope>): ...`, tests rouges), puis implémentation jusqu'au vert (commit `feat(<scope>): ...`). Les hooks `commit-msg` et `pre-push` de `.githooks/` sont des wrappers suivis par git : ils lancent les hooks du kernel de la worktree courante (`.agents/hooks/`) et bloquent si le submodule est absent. Le hook `commit-msg` vérifie le format du message, lance `make quality` et `make test`, et bloque en cas d'échec ; un commit de type `test` tolère des tests rouges. Le hook `pre-push` refuse tout push sur `main` ou `master`.
+
+### Règles des agents
+
+`AGENTS.md` est généré par `.agents/scripts/compile-agents` à partir des règles du kernel et de `rules/project/` ; `CLAUDE.md` pointe vers lui. Après toute modification de `rules/project/` ou montée de version du kernel, relancer le script et commiter `AGENTS.md` : `make quality` échoue s'il n'est pas à jour.
 
 ### CI
 
