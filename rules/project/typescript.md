@@ -4,15 +4,15 @@ Add explicit types to all variables and function signatures.
 Export exactly one thing per file.
 Use a typed object parameter instead of multiple positional parameters.
 Prefer map/filter/reduce over imperative loops.
-Write functional, declarative code; do not use classes.
+Write functional, declarative code.
+Do not use classes.
 Use precise, descriptive types.
 Never use the `object` or `{}` types.
 Mark data that doesn't change as readonly.
 Use `as const` on literal values that shouldn't widen.
-Validate input at boundaries (API routes, forms) using Zod.
-Log errors via console.error with the error object attached; never console.log an error.
-Write JSDoc on every public function and component.
-Name classes, interfaces, and types in PascalCase.
+Log errors with console.error, attaching the error object.
+As an exception to the kernel rule "Write a comment only when it conveys non-obvious rationale the code can't express on its own.", write JSDoc on every exported function and component.
+Name interfaces and types in PascalCase.
 Name variables, functions, and methods in camelCase.
 Name files and folders in kebab-case.
 Write constant names in UPPER_SNAKE_CASE.
