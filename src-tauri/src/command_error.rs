@@ -145,12 +145,37 @@ mod tests {
     use std::io;
     use std::path::PathBuf;
 
-    use quittance_core::PartyError;
+    use quittance_core::{Party, PartyError, validate_receipt};
+    use quittance_template::{IssueDetails, render_html};
     use serde::Deserialize;
     use tauri::ipc::InvokeError;
 
     use super::*;
-    use crate::test_support::{date, from_ipc_json, to_ipc_json};
+    use crate::test_support::{date, from_ipc_json, sample_payload, to_ipc_json};
+
+    /// Erreur produite par `quittance-template` pour un total trop grand pour être écrit
+    /// en lettres.
+    fn amount_in_words_error() -> TemplateError {
+        let landlord = Party::new(
+            "Paul Durand",
+            "3 avenue Foch, 69006 Lyon",
+            "paul.durand@example.fr",
+        )
+        .unwrap();
+        let mut input = sample_payload().into_receipt_input().unwrap();
+        input.rent_cents = u64::MAX - input.charges_cents;
+        let receipt = validate_receipt(landlord, input).unwrap();
+        let issue = IssueDetails {
+            place: "Lyon".to_owned(),
+            date: date(2026, 10, 6),
+        };
+        let error = render_html("standard", &receipt, &issue, None).unwrap_err();
+        assert!(
+            matches!(error, TemplateError::AmountInWords(_)),
+            "got {error:?}"
+        );
+        error
+    }
 
     /// Forme du rejet vue par l'UI.
     #[derive(Debug, Deserialize)]
@@ -293,6 +318,7 @@ mod tests {
             TemplateError::UnknownTemplate("fancy".to_owned()),
             TemplateError::InvalidSignature,
             TemplateError::Rendering("broken template".into()),
+            amount_in_words_error(),
         ];
 
         for error in errors {
@@ -309,6 +335,10 @@ mod tests {
                 path: PathBuf::from("/nonexistent/chrome"),
             },
             PdfError::HtmlTooLarge { size: 2, max: 1 },
+            PdfError::BrowserLaunch {
+                path: PathBuf::from("/opt/chromium/chrome"),
+                source: "chrome exited".into(),
+            },
             PdfError::TabCreation("no tab".into()),
             PdfError::Rendering("chrome crashed".into()),
         ];

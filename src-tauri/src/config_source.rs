@@ -141,6 +141,39 @@ mod tests {
     }
 
     #[test]
+    fn given_single_quoted_value_when_reading_variables_then_it_is_taken_literally() {
+        let literal_value = r##"p@$HOME ${USER} \n "#x"##;
+        let env_file = env_file_with(
+            "single-quoted-env-file",
+            &format!("{FILE_ONLY_VARIABLE}='{literal_value}'\n"),
+        );
+
+        let variables = EnvFileConfigSource::new(&env_file).variables().unwrap();
+
+        assert_eq!(
+            variables.get(FILE_ONLY_VARIABLE).map(String::as_str),
+            Some(literal_value)
+        );
+        fs::remove_file(env_file).unwrap();
+    }
+
+    #[test]
+    fn given_single_quoted_value_with_escaped_apostrophe_when_reading_variables_then_it_is_kept() {
+        let env_file = env_file_with(
+            "apostrophe-env-file",
+            &format!(r"{FILE_ONLY_VARIABLE}='it'\''s'{}", '\n'),
+        );
+
+        let variables = EnvFileConfigSource::new(&env_file).variables().unwrap();
+
+        assert_eq!(
+            variables.get(FILE_ONLY_VARIABLE).map(String::as_str),
+            Some("it's")
+        );
+        fs::remove_file(env_file).unwrap();
+    }
+
+    #[test]
     fn given_malformed_env_file_when_reading_variables_then_env_file_is_unreadable() {
         let env_file = env_file_with("malformed-env-file", "LANDLORD_CITY='Lyon\n");
 

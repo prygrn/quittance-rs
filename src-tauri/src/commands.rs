@@ -73,7 +73,49 @@ fn logged<T>(result: Result<T, CommandError>) -> Result<T, CommandError> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
+    use crate::command_error::CommandErrorCode;
+    use crate::config_source::ConfigSource;
+    use crate::test_support::unique_temp_path;
+
+    const SECRET: &str = "s3cret";
+
+    #[test]
+    fn given_malformed_env_file_holding_a_secret_when_reporting_the_error_then_secret_is_neither_sent_nor_logged()
+     {
+        let malformed_contents = [
+            format!("LANDLORD_CITY='Lyon\nSMTP_PASSWORD={SECRET}\n"),
+            format!("SMTP_PASSWORD={SECRET} trailing\n"),
+            format!("SMTP_PASSWORD=\"{SECRET}\n"),
+        ];
+
+        for content in malformed_contents {
+            let env_file = unique_temp_path("secret-env-file");
+            fs::write(&env_file, &content).unwrap();
+
+            let config_error = EnvFileConfigSource::new(&env_file).variables().unwrap_err();
+            let command_error = CommandError::from(config_error);
+            fs::remove_file(&env_file).unwrap();
+
+            assert_eq!(command_error.code(), CommandErrorCode::Config);
+            assert!(
+                command_error
+                    .message()
+                    .contains(&env_file.display().to_string())
+            );
+            assert!(
+                !command_error.message().contains(SECRET),
+                "sent to the UI for {content:?}: {}",
+                command_error.message()
+            );
+            assert!(
+                !command_error.to_string().contains(SECRET),
+                "logged for {content:?}: {command_error}"
+            );
+        }
+    }
 
     #[test]
     fn given_embedded_templates_when_listing_then_ui_receives_each_one_in_order() {
