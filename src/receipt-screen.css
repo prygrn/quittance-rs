@@ -63,8 +63,27 @@ button {
   margin: 0;
 }
 
-.screen {
+.app {
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.title-bar {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eceef2;
+  border-bottom: 1px solid var(--divider);
+  font-size: 12.5px;
+  color: #4a5260;
+}
+
+.screen {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 440px minmax(0, 1fr);
 }

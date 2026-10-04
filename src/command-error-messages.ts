@@ -21,8 +21,8 @@ export const COMMAND_ERROR_MESSAGES: Readonly<
     text: "Il manque des informations sur le bailleur ou sur l'envoi des emails dans le fichier de configuration. Complétez-le.",
   },
   pdf: {
-    title: "Le PDF n'a pas pu être créé",
-    text: "La quittance n'a pas été envoyée. Vous pouvez réessayer sans refaire l'aperçu.",
+    title: "La quittance n'a pas pu être générée",
+    text: "La création du document PDF a échoué. Rien n'a été envoyé : vous pouvez réessayer.",
   },
   mail: {
     title: "Le mail n'a pas pu partir",
@@ -30,6 +30,6 @@ export const COMMAND_ERROR_MESSAGES: Readonly<
   },
   unknown: {
     title: "Une erreur inattendue s'est produite",
-    text: "La quittance n'a pas été envoyée. Réessayez ; si le problème persiste, redémarrez l'application.",
+    text: "L'opération n'a pas abouti et rien n'a été envoyé. Réessayez ; si le problème persiste, redémarrez l'application.",
   },
 };

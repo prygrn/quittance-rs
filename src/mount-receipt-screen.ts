@@ -84,7 +84,7 @@ export async function mountReceiptScreen(options: {
     gateway.renderPreview(request).then(
       (html: string) => dispatch({ type: "previewReceived", ...request, html }),
       (reason: unknown) => {
-        console.error(`${LOG_CODES.PREVIEW_FAILED}: preview command failed`, reason);
+        console.error(`[${LOG_CODES.PREVIEW_FAILED}] preview command failed`, reason);
         dispatch({ type: "previewFailed", ...request, code: toCommandErrorCode(reason) });
       },
     );
@@ -101,7 +101,7 @@ export async function mountReceiptScreen(options: {
     gateway.sendReceipt(request).then(
       () => dispatch({ type: "sendSucceeded" }),
       (reason: unknown) => {
-        console.error(`${LOG_CODES.SEND_FAILED}: send command failed`, reason);
+        console.error(`[${LOG_CODES.SEND_FAILED}] send command failed`, reason);
         dispatch({ type: "sendFailed", code: toCommandErrorCode(reason) });
       },
     );
@@ -120,7 +120,7 @@ export async function mountReceiptScreen(options: {
   try {
     const templates = await gateway.listTemplates();
     if (templates.length === 0) {
-      console.error(`${LOG_CODES.NO_TEMPLATE}: the backend lists no receipt template`);
+      console.error(`[${LOG_CODES.NO_TEMPLATE}] the backend lists no receipt template`);
       update({ templateLoadError: "template" });
       return;
     }
@@ -135,7 +135,7 @@ export async function mountReceiptScreen(options: {
     );
     update({ templates });
   } catch (reason: unknown) {
-    console.error(`${LOG_CODES.TEMPLATE_LISTING_FAILED}: template listing command failed`, reason);
+    console.error(`[${LOG_CODES.TEMPLATE_LISTING_FAILED}] template listing command failed`, reason);
     update({ templateLoadError: toCommandErrorCode(reason) });
   }
 }
