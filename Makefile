@@ -3,8 +3,7 @@
 
 setup:
 	npm ci
-	git config core.hooksPath .githooks
-	ln -sfn ../../rules/project .agents/rules/project
+	git config core.hooksPath .agents/hooks
 
 format:
 	cargo fmt --all
