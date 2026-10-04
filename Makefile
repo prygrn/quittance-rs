@@ -1,9 +1,14 @@
 # Point d'entrée unique des commandes de développement, partagé par le hook git et la CI.
-.PHONY: setup format fmt-check lint quality build-debug test-unit test build-release test-integration test-e2e ci msrv-version msrv-check
+.PHONY: setup system-deps format fmt-check lint quality build-debug test-unit test build-release test-integration test-e2e ci msrv-version msrv-check
 
 setup:
 	npm ci
 	git config core.hooksPath .githooks
+
+# Bibliothèques système requises pour compiler l'app Tauri (Debian, Ubuntu).
+system-deps:
+	sudo apt-get update
+	sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev
 
 format:
 	cargo fmt --all
