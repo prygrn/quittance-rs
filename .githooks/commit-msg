@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Copy into the project's tracked hooks directory, once per hook name (commit-msg, pre-push),
+# and point core.hooksPath at that directory. Each worktree then runs the kernel hook of its
+# own .agents checkout, and fails loudly instead of silently skipping when it has none.
+set -euo pipefail
+
+HOOK_NAME="$(basename "$0")"
+readonly HOOK_NAME
+readonly KERNEL_HOOK=".agents/hooks/$HOOK_NAME"
+
+if [[ ! -x "$KERNEL_HOOK" ]]; then
+  echo "$HOOK_NAME: $KERNEL_HOOK is missing, run git submodule update --init" >&2
+  exit 1
+fi
+
+exec "$KERNEL_HOOK" "$@"
