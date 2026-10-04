@@ -63,12 +63,17 @@ fn with_system_service<T>(
     })
 }
 
-/// Trace l'échec côté backend, code d'erreur compris, avant de le renvoyer à l'UI.
+/// Trace l'échec côté backend avant de le renvoyer à l'UI.
 fn logged<T>(result: Result<T, CommandError>) -> Result<T, CommandError> {
     if let Err(error) = &result {
-        eprintln!("command failed: {error}");
+        eprintln!("{}", failure_log_line(error));
     }
     result
+}
+
+/// Ligne de trace d'une commande en échec, code d'erreur compris.
+fn failure_log_line(error: &CommandError) -> String {
+    format!("command failed: {error}")
 }
 
 #[cfg(test)]
