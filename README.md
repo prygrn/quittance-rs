@@ -61,6 +61,7 @@ L'application lit le fichier `.env` placé **dans le même dossier que son exéc
 - Une variable déjà définie dans l'environnement au lancement l'emporte sur celle du fichier.
 - Un fichier absent n'est pas une erreur : seules les variables manquantes sont signalées.
 - L'aperçu n'exige que le bailleur (`LANDLORD_*`) et `SIGNATURE_PATH`. `CHROME_PATH` et `SMTP_*` ne sont exigés qu'à l'envoi.
+- Une valeur entre guillemets simples est prise littéralement ; entre guillemets doubles ou sans guillemets, `$NOM` est remplacé par une variable et `\` échappe le caractère suivant. Écrire donc `SMTP_PASSWORD` entre guillemets simples (une apostrophe s'y écrit `'\''`).
 
 ## Développement
 
@@ -68,6 +69,7 @@ Prérequis : Rust stable, Node ≥ 22.12, Chromium ou Chrome, Docker (Mailpit po
 
 ```bash
 git submodule update --init
+make system-deps  # bibliothèques système de Tauri (Debian, Ubuntu ; sudo)
 make setup        # dépendances npm, hooks git (.githooks)
 ```
 
