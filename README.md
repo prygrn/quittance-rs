@@ -60,7 +60,7 @@ Prérequis : Rust stable, Node ≥ 22.12, Chromium ou Chrome, Docker (Mailpit po
 
 ```bash
 git submodule update --init
-make setup        # dépendances npm, hooks git du kernel (.agents/hooks)
+make setup        # dépendances npm, hooks git (.githooks)
 ```
 
 | Commande                | Effet                                                           |
@@ -76,7 +76,7 @@ make setup        # dépendances npm, hooks git du kernel (.agents/hooks)
 
 ### Workflow test-first
 
-Pour chaque feature : API publique en stubs et suite complète de tests unitaires d'abord (commit `test(<scope>): ...`, tests rouges), puis implémentation jusqu'au vert (commit `feat(<scope>): ...`). Le hook `commit-msg` du kernel (`.agents/hooks/`) vérifie le format du message, lance `make quality` et `make test`, et bloque en cas d'échec ; un commit de type `test` tolère des tests rouges.
+Pour chaque feature : API publique en stubs et suite complète de tests unitaires d'abord (commit `test(<scope>): ...`, tests rouges), puis implémentation jusqu'au vert (commit `feat(<scope>): ...`). Les hooks `commit-msg` et `pre-push` de `.githooks/` sont des wrappers suivis par git : ils lancent les hooks du kernel de la worktree courante (`.agents/hooks/`) et bloquent si le submodule est absent. Le hook `commit-msg` vérifie le format du message, lance `make quality` et `make test`, et bloque en cas d'échec ; un commit de type `test` tolère des tests rouges. Le hook `pre-push` refuse tout push sur `main` ou `master`.
 
 ### Règles des agents
 
