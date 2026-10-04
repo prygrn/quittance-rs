@@ -20,6 +20,7 @@ lint:
 	npx tsc --noEmit
 
 quality: fmt-check lint
+	.agents/scripts/compile-agents --check
 
 build-debug:
 	cargo build --workspace
