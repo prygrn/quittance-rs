@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;background:#e6e8ec;color:#1c2330;font-family:system-ui,-apple-system,"Segoe UI",Ubuntu,Cantarell,"Noto Sans",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#2a5aa8}a:hover{color:#1d4280}
+textarea,input,select,button{font-family:inherit}
+::placeholder{color:#7a828f}
+@keyframes qspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:2.4s !important}}
+</style>
+</helmet>
+<div style="min-height:100vh;box-sizing:border-box;padding:24px;width:max-content;min-width:100%;display:flex;flex-direction:column;align-items:safe center;gap:16px">
+
+<sc-if value="{{ showSwitcher }}" hint-placeholder-val="{{ true }}">
+<nav aria-label="États de la maquette" style="width:1200px;display:flex;flex-direction:column;gap:8px">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span style="font-size:12px;font-weight:600;color:#4a5260;text-transform:uppercase;letter-spacing:.06em;margin-right:6px">État</span>
+    <sc-for list="{{ views }}" as="v" hint-placeholder-count="8">
+      <button type="button" onClick="{{ v.onClick }}" aria-pressed="{{ v.pressed }}" style="font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid {{ v.bc }};background:{{ v.bg }};color:{{ v.fg }};cursor:pointer">{{ v.label }}</button>
+    </sc-for>
+  </div>
+  <sc-if value="{{ isEchec }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span style="font-size:12px;font-weight:600;color:#4a5260;text-transform:uppercase;letter-spacing:.06em;margin-right:6px">Cause</span>
+    <sc-for list="{{ causes }}" as="c" hint-placeholder-count="7">
+      <button type="button" onClick="{{ c.onClick }}" aria-pressed="{{ c.pressed }}" style="font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid {{ c.bc }};background:{{ c.bg }};color:{{ c.fg }};cursor:pointer">{{ c.label }}</button>
+    </sc-for>
+  </div>
+  </sc-if>
+</nav>
+</sc-if>
+
+<div style="width:1200px;height:800px;background:#f7f8fa;border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px rgba(20,30,50,.12),0 18px 50px rgba(20,30,50,.18);display:flex;flex-direction:column">
+  <div style="height:32px;flex:none;display:flex;align-items:center;justify-content:center;background:#eceef2;border-bottom:1px solid #d9dde3;font-size:12.5px;color:#4a5260">Quittances de loyer</div>
+
+  <div style="flex:1;min-height:0;display:grid;grid-template-columns:440px minmax(0,1fr)">
+
+    <form id="form-quittance" novalidate="" onSubmit="{{ onSubmit }}" aria-busy="{{ sending }}" style="display:flex;flex-direction:column;min-height:0;background:#fff;border-right:1px solid #d9dde3">
+      <header style="padding:20px 24px 14px;border-bottom:1px solid #e6e9ee;display:flex;flex-direction:column;gap:4px">
+        <h1 style="margin:0;font-size:18px;font-weight:650;letter-spacing:-.01em">Nouvelle quittance</h1>
+        <p style="margin:0;font-size:12.5px;color:#5a6372">Bailleur : Jean Martin · tous les champs sont obligatoires</p>
+      </header>
+
+      <fieldset id="champs" disabled="{{ locked }}" style="flex:1;min-height:0;overflow-y:auto;margin:0;padding:18px 24px 24px;border:0;display:flex;flex-direction:column;gap:22px">
+
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label for="modele" style="font-size:13px;font-weight:600;color:#2a3140">Modèle de quittance</label>
+          <select id="modele" name="modele" required="" value="{{ model }}" onChange="{{ onModel }}" style="width:100%;box-sizing:border-box;font-size:14px;color:#1c2330;padding:8px 10px;border:1px solid #c4cad3;border-radius:6px;background:{{ selBg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+            <option value="standard">Standard</option>
+          </select>
+        </div>
+
+        <fieldset style="margin:0;padding:0;border:0;display:flex;flex-direction:column;gap:14px">
+          <legend style="padding:0;margin-bottom:12px;font-size:11.5px;font-weight:700;color:#5a6372;text-transform:uppercase;letter-spacing:.07em">Locataire</legend>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label for="nom-locataire" style="font-size:13px;font-weight:600;color:#2a3140">Nom du locataire</label>
+            <input id="nom-locataire" name="nom-locataire" type="text" autocomplete="off" required="" value="{{ F.nom.value }}" onChange="{{ F.nom.onChange }}" aria-invalid="{{ F.nom.invalid }}" aria-describedby="{{ F.nom.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;color:#1c2330;padding:8px 10px;border:1px solid {{ F.nom.bc }};box-shadow:{{ F.nom.sh }};border-radius:6px;background:{{ F.nom.bg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+            <sc-if value="{{ F.nom.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-nom-locataire" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.nom.err }}</p></sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label for="adresse-locataire" style="font-size:13px;font-weight:600;color:#2a3140">Adresse du locataire</label>
+            <textarea id="adresse-locataire" name="adresse-locataire" rows="2" required="" value="{{ F.adrLoc.value }}" onChange="{{ F.adrLoc.onChange }}" aria-invalid="{{ F.adrLoc.invalid }}" aria-describedby="{{ F.adrLoc.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.4;color:#1c2330;padding:8px 10px;border:1px solid {{ F.adrLoc.bc }};box-shadow:{{ F.adrLoc.sh }};border-radius:6px;background:{{ F.adrLoc.bg }};outline:none;resize:vertical" style-focus="outline:2px solid #2a5aa8;outline-offset:1px"></textarea>
+            <sc-if value="{{ F.adrLoc.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-adresse-locataire" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.adrLoc.err }}</p></sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label for="email-locataire" style="font-size:13px;font-weight:600;color:#2a3140">Email du locataire</label>
+            <input id="email-locataire" name="email-locataire" type="email" autocomplete="off" required="" value="{{ F.email.value }}" onChange="{{ F.email.onChange }}" aria-invalid="{{ F.email.invalid }}" aria-describedby="{{ F.email.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;color:#1c2330;padding:8px 10px;border:1px solid {{ F.email.bc }};box-shadow:{{ F.email.sh }};border-radius:6px;background:{{ F.email.bg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+            <sc-if value="{{ F.email.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-email-locataire" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.email.err }}</p></sc-if>
+          </div>
+        </fieldset>
+
+        <fieldset style="margin:0;padding:0;border:0;display:flex;flex-direction:column;gap:14px">
+          <legend style="padding:0;margin-bottom:12px;font-size:11.5px;font-weight:700;color:#5a6372;text-transform:uppercase;letter-spacing:.07em">Logement et période</legend>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <label for="adresse-logement" style="font-size:13px;font-weight:600;color:#2a3140">Adresse du logement</label>
+            <textarea id="adresse-logement" name="adresse-logement" rows="2" required="" value="{{ F.adrLog.value }}" onChange="{{ F.adrLog.onChange }}" aria-invalid="{{ F.adrLog.invalid }}" aria-describedby="{{ F.adrLog.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;line-height:1.4;color:#1c2330;padding:8px 10px;border:1px solid {{ F.adrLog.bc }};box-shadow:{{ F.adrLog.sh }};border-radius:6px;background:{{ F.adrLog.bg }};outline:none;resize:vertical" style-focus="outline:2px solid #2a5aa8;outline-offset:1px"></textarea>
+            <sc-if value="{{ F.adrLog.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-adresse-logement" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.adrLog.err }}</p></sc-if>
+          </div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label for="debut-periode" style="font-size:13px;font-weight:600;color:#2a3140">Début de période</label>
+              <input id="debut-periode" name="debut-periode" type="text" inputmode="numeric" placeholder="jj/mm/aaaa" autocomplete="off" required="" value="{{ F.debut.value }}" onChange="{{ F.debut.onChange }}" aria-invalid="{{ F.debut.invalid }}" aria-describedby="{{ F.debut.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;font-variant-numeric:tabular-nums;color:#1c2330;padding:8px 10px;border:1px solid {{ F.debut.bc }};box-shadow:{{ F.debut.sh }};border-radius:6px;background:{{ F.debut.bg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+              <sc-if value="{{ F.debut.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-debut-periode" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.debut.err }}</p></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label for="fin-periode" style="font-size:13px;font-weight:600;color:#2a3140">Fin de période</label>
+              <input id="fin-periode" name="fin-periode" type="text" inputmode="numeric" placeholder="jj/mm/aaaa" autocomplete="off" required="" value="{{ F.fin.value }}" onChange="{{ F.fin.onChange }}" aria-invalid="{{ F.fin.invalid }}" aria-describedby="{{ F.fin.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;font-variant-numeric:tabular-nums;color:#1c2330;padding:8px 10px;border:1px solid {{ F.fin.bc }};box-shadow:{{ F.fin.sh }};border-radius:6px;background:{{ F.fin.bg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+              <sc-if value="{{ F.fin.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-fin-periode" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.fin.err }}</p></sc-if>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset style="margin:0;padding:0;border:0;display:flex;flex-direction:column;gap:14px">
+          <legend style="padding:0;margin-bottom:12px;font-size:11.5px;font-weight:700;color:#5a6372;text-transform:uppercase;letter-spacing:.07em">Paiement</legend>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label for="loyer" style="font-size:13px;font-weight:600;color:#2a3140">Loyer (€)</label>
+              <input id="loyer" name="loyer" type="text" inputmode="decimal" placeholder="650" autocomplete="off" required="" value="{{ F.loyer.value }}" onChange="{{ F.loyer.onChange }}" aria-invalid="{{ F.loyer.invalid }}" aria-describedby="{{ F.loyer.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;text-align:right;font-variant-numeric:tabular-nums;color:#1c2330;padding:8px 10px;border:1px solid {{ F.loyer.bc }};box-shadow:{{ F.loyer.sh }};border-radius:6px;background:{{ F.loyer.bg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+              <sc-if value="{{ F.loyer.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-loyer" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.loyer.err }}</p></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <label for="charges" style="font-size:13px;font-weight:600;color:#2a3140">Forfait de charges (€)</label>
+              <input id="charges" name="charges" type="text" inputmode="decimal" placeholder="80" autocomplete="off" required="" value="{{ F.charges.value }}" onChange="{{ F.charges.onChange }}" aria-invalid="{{ F.charges.invalid }}" aria-describedby="{{ F.charges.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;text-align:right;font-variant-numeric:tabular-nums;color:#1c2330;padding:8px 10px;border:1px solid {{ F.charges.bc }};box-shadow:{{ F.charges.sh }};border-radius:6px;background:{{ F.charges.bg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+              <sc-if value="{{ F.charges.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-charges" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.charges.err }}</p></sc-if>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 12px;background:#f3f5f8;border-radius:6px">
+            <label for="total" style="font-size:13px;font-weight:600;color:#2a3140">Total (loyer + forfait de charges)</label>
+            <output id="total" name="total" for="loyer charges" aria-live="polite" style="font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;color:#1c2330">{{ total }}</output>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;max-width:202px">
+            <label for="date-paiement" style="font-size:13px;font-weight:600;color:#2a3140">Date de paiement</label>
+            <input id="date-paiement" name="date-paiement" type="text" inputmode="numeric" placeholder="jj/mm/aaaa" autocomplete="off" required="" value="{{ F.paiement.value }}" onChange="{{ F.paiement.onChange }}" aria-invalid="{{ F.paiement.invalid }}" aria-describedby="{{ F.paiement.desc }}" style="width:100%;box-sizing:border-box;font-size:14px;font-variant-numeric:tabular-nums;color:#1c2330;padding:8px 10px;border:1px solid {{ F.paiement.bc }};box-shadow:{{ F.paiement.sh }};border-radius:6px;background:{{ F.paiement.bg }};outline:none" style-focus="outline:2px solid #2a5aa8;outline-offset:1px">
+            <sc-if value="{{ F.paiement.hasErr }}" hint-placeholder-val="{{ false }}"><p id="err-date-paiement" style="margin:0;font-size:12.5px;color:#b42318;display:flex;gap:6px;align-items:baseline"><span aria-hidden="true" style="font-weight:700">!</span>{{ F.paiement.err }}</p></sc-if>
+          </div>
+        </fieldset>
+      </fieldset>
+
+      <footer style="flex:none;padding:14px 24px 18px;border-top:1px solid #e6e9ee;background:#fff;display:flex;flex-direction:column;gap:12px">
+        <p id="annonce" role="status" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);margin:0">{{ announce }}</p>
+
+        <sc-if value="{{ bannerErrors }}" hint-placeholder-val="{{ false }}">
+          <div role="alert" style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:#fdf3f2;border:1px solid #f1c7c2;color:#8a1c12;font-size:13px;line-height:1.4">
+            <span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;background:#b42318;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">!</span>
+            <span>{{ errorSummary }}</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ bannerStale }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:6px;background:#f3f5f8;border:1px solid #dde1e7;color:#3a4250;font-size:13px;line-height:1.4">
+            <span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;background:#5a6372;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">i</span>
+            <span>Le formulaire a été modifié. Relancez l'aperçu avant d'envoyer.</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ bannerSuccess }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:6px;background:#eef7f1;border:1px solid #b9dcc5;color:#174f31;font-size:13px;line-height:1.45">
+            <span aria-hidden="true" style="flex:none;width:20px;height:20px;border-radius:50%;background:#1f6f43;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">✓</span>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <strong style="font-size:14px">Quittance envoyée</strong>
+              <span>Le mail est parti à <strong>{{ recipient }}</strong>. Une copie cachée vous a été adressée pour vos archives.</span>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ bannerSendFail }}" hint-placeholder-val="{{ false }}">
+          <div role="alert" style="display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:6px;background:#fdf3f2;border:1px solid #f1c7c2;color:#8a1c12;font-size:13px;line-height:1.45">
+            <span aria-hidden="true" style="flex:none;width:20px;height:20px;border-radius:50%;background:#b42318;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">!</span>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <strong style="font-size:14px">{{ fail.title }}</strong>
+              <span>{{ fail.text }}</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasRecipient }}" hint-placeholder-val="{{ false }}">
+          <p style="margin:0;font-size:12.5px;color:#5a6372">À : <span style="color:#1c2330">{{ recipient }}</span> · copie cachée : jean.martin@exemple.fr</p>
+        </sc-if>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:10px">
+          <button id="btn-apercu" type="submit" disabled="{{ previewBtnDisabled }}" aria-busy="{{ loadingPreview }}" style="height:40px;border-radius:6px;font-size:14px;font-weight:600;border:1px solid {{ previewBtn.bc }};background:{{ previewBtn.bg }};color:{{ previewBtn.fg }};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" style-focus="outline:2px solid #2a5aa8;outline-offset:2px">Aperçu</button>
+          <sc-if value="{{ showSendBtn }}" hint-placeholder-val="{{ true }}">
+            <button id="btn-envoyer" type="button" onClick="{{ onSend }}" disabled="{{ sendDisabled }}" aria-disabled="{{ sendDisabled }}" style="height:40px;border-radius:6px;font-size:14px;font-weight:600;border:1px solid {{ sendBtn.bg }};background:{{ sendBtn.bg }};color:{{ sendBtn.fg }};cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px" style-focus="outline:2px solid #2a5aa8;outline-offset:2px">{{ btnSpinner }}{{ sendLabel }}</button>
+          </sc-if>
+          <sc-if value="{{ showRetry }}" hint-placeholder-val="{{ false }}">
+            <button id="btn-reessayer" type="button" onClick="{{ onSend }}" style="height:40px;border-radius:6px;font-size:14px;font-weight:600;border:1px solid #2a5aa8;background:#2a5aa8;color:#fff;cursor:pointer" style-focus="outline:2px solid #2a5aa8;outline-offset:2px">Réessayer l'envoi</button>
+          </sc-if>
+        </div>
+      </footer>
+    </form>
+
+    <section aria-labelledby="titre-apercu" style="display:flex;flex-direction:column;min-height:0;background:#e9ecf0">
+      <div style="flex:none;height:48px;box-sizing:border-box;padding:0 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #d9dde3;background:#f1f3f6">
+        <h2 id="titre-apercu" style="margin:0;font-size:13px;font-weight:650;color:#2a3140">Aperçu de la quittance</h2>
+        <span style="font-size:12.5px;color:{{ previewStatus.fg }};display:flex;align-items:center;gap:6px"><span aria-hidden="true" style="width:7px;height:7px;border-radius:50%;background:{{ previewStatus.dot }}"></span>{{ previewStatus.label }}</span>
+      </div>
+
+      <div id="apercu" aria-busy="{{ loadingPreview }}" tabindex="0" aria-label="Zone d'aperçu" style="flex:1;min-height:0;overflow-y:auto;padding:28px 20px 40px;display:flex;flex-direction:column;align-items:center" style-focus="outline:2px solid #2a5aa8;outline-offset:-4px">
+
+        <sc-if value="{{ paneEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:auto;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;max-width:340px">
+            <div aria-hidden="true" style="width:120px;height:170px;border:1.5px dashed #a9b1bd;border-radius:4px;background:#f4f6f8"></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <p style="margin:0;font-size:15px;font-weight:600;color:#2a3140">{{ emptyTitle }}</p>
+              <p style="margin:0;font-size:13px;line-height:1.5;color:#5a6372;text-wrap:pretty">{{ emptyText }}</p>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ loadingPreview }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:auto;display:flex;flex-direction:column;align-items:center;gap:14px">
+            {{ bigSpinner }}
+            <p style="margin:0;font-size:14px;color:#3a4250">Génération de l'aperçu…</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ previewFailed }}" hint-placeholder-val="{{ false }}">
+          <div role="alert" style="margin:auto;max-width:380px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:28px 28px 24px;background:#fff;border:1px solid #f1c7c2;border-radius:8px">
+            <span aria-hidden="true" style="width:36px;height:36px;border-radius:50%;background:#fdf3f2;border:1.5px solid #b42318;color:#b42318;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center">!</span>
+            <p style="margin:0;font-size:15px;font-weight:650;color:#8a1c12">{{ fail.title }}</p>
+            <p style="margin:0;font-size:13px;line-height:1.5;color:#3a4250;text-wrap:pretty">{{ fail.text }}</p>
+            <p style="margin:4px 0 0;font-size:12.5px;color:#5a6372">Relancez ensuite l'aperçu avec le bouton « Aperçu ».</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ previewShown }}" hint-placeholder-val="{{ true }}">
+          <div id="apercu-cadre" role="document" aria-label="Quittance, page A4" style="flex:none;width:595px;min-height:842px;box-sizing:border-box;background:#fff;box-shadow:0 1px 2px rgba(20,30,50,.12),0 6px 24px rgba(20,30,50,.12);padding:52px 56px 44px;font-family:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif;color:#1a1a1a;font-size:11.5px;line-height:1.5;display:flex;flex-direction:column;gap:22px;opacity:{{ pageOpacity }}">
+            <header style="display:flex;flex-direction:column;gap:4px;border-bottom:1px solid #1a1a1a;padding-bottom:14px">
+              <h3 style="margin:0;font-size:20px;font-weight:600;letter-spacing:.12em;text-transform:uppercase">Quittance de loyer</h3>
+              <p style="margin:0;font-size:12px">Période du {{ doc.debut }} au {{ doc.fin }}</p>
+            </header>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#555">Bailleur</span>
+                <strong style="font-weight:600">Jean Martin</strong>
+                <span>8 avenue Foch</span>
+                <span>69006 Lyon</span>
+                <span>jean.martin@exemple.fr</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px">
+                <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#555">Locataire</span>
+                <strong style="font-weight:600">{{ doc.nom }}</strong>
+                <span style="white-space:pre-line">{{ doc.adrLoc }}</span>
+                <span>{{ doc.email }}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#555">Adresse du logement</span>
+              <span style="white-space:pre-line">{{ doc.adrLog }}</span>
+            </div>
+            <p style="margin:0;text-align:justify;text-wrap:pretty">Je soussigné Jean Martin, bailleur du logement désigné ci-dessus, déclare avoir reçu de {{ doc.nom }} la somme de {{ doc.total }} au titre du loyer et du forfait de charges pour la période du {{ doc.debut }} au {{ doc.fin }}, et lui en donne quittance, sous réserve de tous mes droits.</p>
+            <table style="width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums">
+              <tbody>
+                <tr><td style="padding:7px 0;border-bottom:1px solid #d6d6d6">Loyer</td><td style="padding:7px 0;border-bottom:1px solid #d6d6d6;text-align:right">{{ doc.loyer }}</td></tr>
+                <tr><td style="padding:7px 0;border-bottom:1px solid #d6d6d6">Forfait de charges</td><td style="padding:7px 0;border-bottom:1px solid #d6d6d6;text-align:right">{{ doc.charges }}</td></tr>
+                <tr><td style="padding:8px 0;font-weight:600;border-bottom:1.5px solid #1a1a1a">Total reçu</td><td style="padding:8px 0;font-weight:600;text-align:right;border-bottom:1.5px solid #1a1a1a">{{ doc.total }}</td></tr>
+              </tbody>
+            </table>
+            <p style="margin:0">Paiement reçu le {{ doc.paiement }}.</p>
+            <div style="align-self:flex-end;display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:200px">
+              <span>Fait à Lyon, le {{ doc.emis }}</span>
+              <div aria-label="Signature du bailleur" role="img" style="width:180px;height:64px;border-radius:2px;background:repeating-linear-gradient(135deg,#f2f2f2 0 6px,#e8e8e8 6px 12px);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:10px;color:#666">signature (config)</div>
+              <span>Jean Martin</span>
+            </div>
+            <p style="margin:auto 0 0;padding-top:12px;border-top:1px solid #d6d6d6;font-size:9.5px;line-height:1.45;color:#444">Cette quittance annule tous les reçus qui auraient pu être établis précédemment en cas de paiement partiel du montant ci-dessus.</p>
+          </div>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1260,&quot;height&quot;:920},&quot;afficherEtats&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Maquette&quot;},&quot;simulerEchec&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;aucun&quot;,&quot;options&quot;:[&quot;aucun&quot;,&quot;donnees&quot;,&quot;modele&quot;,&quot;signature&quot;,&quot;config&quot;,&quot;pdf&quot;,&quot;smtp&quot;,&quot;inconnue&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Parcours interactif&quot;}}">
+const FIELDS = ['nom','adrLoc','email','adrLog','debut','fin','loyer','charges','paiement'];
+const IDS = {nom:'nom-locataire',adrLoc:'adresse-locataire',email:'email-locataire',adrLog:'adresse-logement',debut:'debut-periode',fin:'fin-periode',loyer:'loyer',charges:'charges',paiement:'date-paiement'};
+const EMPTY = Object.fromEntries(FIELDS.map(f => [f, '']));
+const FILLED = {nom:'Marie Dupont',adrLoc:'12 rue des Lilas, appt 4B\n69003 Lyon',email:'marie.dupont@exemple.fr',adrLog:'12 rue des Lilas, appt 4B\n69003 Lyon',debut:'01/09/2026',fin:'30/09/2026',loyer:'650',charges:'80',paiement:'03/09/2026'};
+const ERR_A = {nom:'',adrLoc:'12 rue des Lilas, appt 4B\n69003 Lyon',email:'marie.dupont@exemple',adrLog:'',debut:'01/09/2026',fin:'31/08/2026',loyer:'1 234,567',charges:'-20',paiement:'31/09/2026'};
+const ERR_B = {...FILLED, loyer:'six cent cinquante', charges:'250 000'};
+const CAUSES = {
+  donnees:{label:'Données refusées',stage:'apercu',title:'Les informations ont été refusées',text:"Certaines valeurs n'ont pas été acceptées pour générer la quittance. Vérifiez le formulaire."},
+  modele:{label:'Modèle',stage:'apercu',title:'Le modèle de quittance est inutilisable',text:"Le modèle « Standard » n'a pas pu être chargé : il est peut-être incomplet ou endommagé."},
+  signature:{label:'Signature',stage:'apercu',title:'La signature est introuvable',text:"Le fichier de signature indiqué dans votre configuration est absent ou illisible."},
+  config:{label:'Configuration incomplète',stage:'apercu',title:'La configuration est incomplète',text:"Il manque des informations sur le bailleur ou sur l'envoi des emails dans le fichier de configuration. Complétez-le."},
+  pdf:{label:'Génération du PDF',stage:'envoi',title:"Le PDF n'a pas pu être créé",text:"La quittance n'a pas été envoyée. Vous pouvez réessayer sans refaire l'aperçu."},
+  smtp:{label:'Envoi du mail (SMTP)',stage:'envoi',title:"Le mail n'a pas pu partir",text:"Le serveur d'envoi n'a pas répondu ou a refusé le message. Vérifiez votre connexion internet, puis réessayez. Rien n'a été envoyé."},
+  inconnue:{label:'Erreur inconnue',stage:'envoi',title:"Une erreur inattendue s'est produite",text:"La quittance n'a pas été envoyée. Réessayez ; si le problème persiste, redémarrez l'application."}
+};
+const VIEWS = [['vide','1 · Vide'],['erreurs1','2 · Erreurs (a)'],['erreurs2','2 · Erreurs (b)'],['chargement','3 · Aperçu en cours'],['apercu','4 · Aperçu chargé'],['envoi','5 · Envoi en cours'],['succes','6 · Succès'],['echec','7 · Échec']];
+const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const ACCENT = '#2a5aa8', ERR = '#b42318';
+
+function parseDate(s) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s||'').trim());
+  if (!m) return null;
+  const d = +m[1], mo = +m[2], y = +m[3], dt = new Date(y, mo-1, d);
+  return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d ? dt : null;
+}
+function parseAmount(s) {
+  const t = (s||'').replace(/[\s\u00a0\u202f]/g,'').replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(t)) return {err:'Montant invalide. Exemple : 650 ou 1 234,56'};
+  const n = parseFloat(t);
+  if (n < 0) return {err:'Le montant ne peut pas être négatif.'};
+  if ((t.split('.')[1]||'').length > 2) return {err:'Deux décimales au maximum.'};
+  if (n > 100000) return {err:'Montant trop élevé (100 000 € au maximum).'};
+  return {n};
+}
+const fmtEur = n => new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(n);
+const fmtDate = dt => dt ? `${dt.getDate()===1?'1er':dt.getDate()} ${MONTHS[dt.getMonth()]} ${dt.getFullYear()}` : '';
+
+function validate(v) {
+  const e = {};
+  FIELDS.forEach(f => { if (!v[f].trim()) e[f] = 'Ce champ est obligatoire.'; });
+  if (!e.email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.email.trim())) e.email = 'Adresse email invalide. Exemple : nom@domaine.fr';
+  ['debut','fin','paiement'].forEach(f => { if (!e[f] && !parseDate(v[f])) e[f] = 'Date invalide. Format attendu : jj/mm/aaaa'; });
+  if (!e.debut && !e.fin && parseDate(v.fin) < parseDate(v.debut)) e.fin = 'La fin de période ne peut pas précéder le début.';
+  ['loyer','charges'].forEach(f => { if (!e[f]) { const r = parseAmount(v[f]); if (r.err) e[f] = r.err; } });
+  return e;
+}
+
+class Component extends DCLogic {
+  state = {view:'apercu', phase:'apercu', values:FILLED, showErr:false, stale:false, cause:'smtp', model:'standard'};
+  componentWillUnmount() { clearTimeout(this.t); }
+
+  setView(k) {
+    clearTimeout(this.t);
+    const base = {view:k, stale:false, showErr:false};
+    const map = {
+      vide:{phase:'vide',values:EMPTY}, erreurs1:{phase:'erreurs',values:ERR_A,showErr:true}, erreurs2:{phase:'erreurs',values:ERR_B,showErr:true},
+      chargement:{phase:'chargement',values:FILLED}, apercu:{phase:'apercu',values:FILLED}, envoi:{phase:'envoi',values:FILLED},
+      succes:{phase:'succes',values:FILLED}, echec:{phase:'echec',values:FILLED}
+    };
+    this.setState({...base, ...map[k]});
+  }
+  invalidate(patch) {
+    this.setState(s => {
+      if (s.phase === 'envoi') return null;
+      const hadPreview = ['apercu','succes','echec','chargement'].includes(s.phase);
+      clearTimeout(this.t);
+      const next = {...s, ...patch(s)};
+      if (s.phase === 'erreurs') return next;
+      return {...next, phase:'vide', stale: hadPreview || s.stale};
+    });
+  }
+  edit(f, val) { this.invalidate(s => ({values:{...s.values, [f]:val}})); }
+  preview(e) {
+    e && e.preventDefault();
+    const s = this.state;
+    if (s.phase === 'envoi' || s.phase === 'chargement') return;
+    const errs = validate(s.values);
+    if (Object.keys(errs).length) {
+      this.setState({phase:'erreurs', showErr:true, stale:false});
+      const first = FIELDS.find(f => errs[f]);
+      setTimeout(() => { const el = document.getElementById(IDS[first]); el && el.focus({preventScroll:false}); }, 30);
+      return;
+    }
+    this.setState({phase:'chargement', showErr:false, stale:false});
+    const sim = this.props.simulerEchec;
+    this.t = setTimeout(() => {
+      if (CAUSES[sim] && CAUSES[sim].stage === 'apercu') this.setState({phase:'echec', cause:sim});
+      else this.setState({phase:'apercu'});
+    }, 1200);
+  }
+  send() {
+    this.setState({phase:'envoi'});
+    const sim = this.props.simulerEchec;
+    this.t = setTimeout(() => {
+      if (CAUSES[sim] && CAUSES[sim].stage === 'envoi') this.setState({phase:'echec', cause:sim});
+      else this.setState({phase:'succes'});
+    }, 1600);
+  }
+
+  renderVals() {
+    const s = this.state, v = s.values;
+    const errs = s.showErr ? validate(v) : {};
+    const locked = s.phase === 'envoi';
+    const F = {};
+    FIELDS.forEach(f => {
+      const e = errs[f];
+      F[f] = {value:v[f], err:e||'', hasErr:!!e, invalid:e?'true':'false', desc:e?'err-'+IDS[f]:undefined,
+        bc:e?ERR:'#c4cad3', sh:e?'0 0 0 1px '+ERR:'none', bg:locked?'#f1f3f5':(e?'#fffafa':'#fff'),
+        onChange: ev => this.edit(f, ev.target.value)};
+    });
+    const la = parseAmount(v.loyer), ca = parseAmount(v.charges);
+    const total = la.n!=null && ca.n!=null ? fmtEur(la.n + ca.n) : '—';
+    const cause = CAUSES[s.cause];
+    const isFail = s.phase === 'echec';
+    const previewFailed = isFail && cause.stage === 'apercu';
+    const sendFailed = isFail && cause.stage === 'envoi';
+    const previewShown = ['apercu','envoi','succes'].includes(s.phase) || sendFailed;
+    const loadingPreview = s.phase === 'chargement';
+    const canSend = s.phase === 'apercu';
+    const nErr = Object.keys(errs).length;
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.email.trim());
+    const recipient = v.email.trim();
+
+    let announce = '';
+    if (loadingPreview) announce = "Génération de l'aperçu en cours.";
+    else if (s.phase==='apercu') announce = "Aperçu prêt. Vous pouvez envoyer la quittance.";
+    else if (locked) announce = 'Envoi en cours.';
+    else if (s.phase==='succes') announce = `Quittance envoyée à ${recipient}.`;
+    else if (isFail) announce = `${cause.title}. ${cause.text}`;
+    else if (s.stale) announce = "Aperçu invalidé : relancez l'aperçu.";
+
+    const statusMap = {
+      vide:{label:s.stale?'À régénérer':'Non généré',fg:'#5a6372',dot:'#a9b1bd'},
+      erreurs:{label:'Non généré',fg:'#5a6372',dot:'#a9b1bd'},
+      chargement:{label:'Génération…',fg:'#2a3140',dot:ACCENT},
+      apercu:{label:'À jour',fg:'#174f31',dot:'#1f6f43'},
+      envoi:{label:'Envoi…',fg:'#2a3140',dot:ACCENT},
+      succes:{label:'Envoyée',fg:'#174f31',dot:'#1f6f43'},
+      echec:{label:previewFailed?'Échec de l\u2019aperçu':'À jour · envoi échoué',fg:'#8a1c12',dot:ERR}
+    };
+    const spin = (size, w, c, track) => React.createElement('span', {'aria-hidden':'true', style:{width:size,height:size,boxSizing:'border-box',border:`${w}px solid ${track}`,borderTopColor:c,borderRadius:'50%',display:'inline-block',animation:'qspin .9s linear infinite',flex:'none'}});
+    const pv = parseDate(v.debut), pf = parseDate(v.fin), pp = parseDate(v.paiement);
+
+    return {
+      showSwitcher: this.props.afficherEtats ?? true,
+      views: VIEWS.map(([k,label]) => { const on = s.view===k; return {label, pressed:on?'true':'false', bg:on?'#1c2330':'#fff', fg:on?'#fff':'#2a3140', bc:on?'#1c2330':'#c4cad3', onClick:()=>this.setView(k)}; }),
+      isEchec: s.view==='echec' || isFail,
+      causes: Object.entries(CAUSES).map(([k,c]) => { const on = isFail && s.cause===k; return {label:`${c.label} · ${c.stage==='apercu'?'aperçu':'envoi'}`, pressed:on?'true':'false', bg:on?'#fdf3f2':'#fff', fg:on?'#8a1c12':'#2a3140', bc:on?ERR:'#c4cad3', onClick:()=>{clearTimeout(this.t); this.setState({view:'echec',phase:'echec',cause:k,values:FILLED,showErr:false,stale:false});}}; }),
+      F, total, locked, sending: locked,
+      model: s.model, onModel: e => this.invalidate(() => ({model:e.target.value})),
+      selBg: locked ? '#f1f3f5' : '#fff',
+      onSubmit: e => this.preview(e),
+      onSend: () => this.send(),
+      announce,
+      bannerErrors: s.phase==='erreurs' && nErr>0,
+      errorSummary: nErr===1 ? "1 champ est à corriger avant l'aperçu." : `${nErr} champs sont à corriger avant l'aperçu.`,
+      bannerStale: s.phase==='vide' && s.stale,
+      bannerSuccess: s.phase==='succes',
+      bannerSendFail: sendFailed,
+      fail: cause,
+      hasRecipient: emailOk && (previewShown || s.phase==='vide' && s.stale) && s.phase!=='succes',
+      recipient,
+      previewBtnDisabled: locked || loadingPreview,
+      previewBtn: (locked||loadingPreview) ? {bg:'#f1f3f5',fg:'#5f6773',bc:'#d3d8de'} : {bg:'#fff',fg:ACCENT,bc:ACCENT},
+      showSendBtn: !sendFailed, showRetry: sendFailed,
+      sendDisabled: !canSend,
+      sendBtn: canSend || locked ? {bg:ACCENT,fg:'#fff'} : {bg:'#e3e6ea',fg:'#5f6773'},
+      sendLabel: locked ? 'Envoi en cours…' : 'Envoyer',
+      btnSpinner: locked ? spin(16, 2, '#fff', 'rgba(255,255,255,.35)') : null,
+      bigSpinner: spin(32, 3, ACCENT, '#cfd6e0'),
+      loadingPreview, previewFailed, previewShown,
+      paneEmpty: s.phase==='vide' || s.phase==='erreurs',
+      emptyTitle: s.stale ? "L'aperçu n'est plus à jour" : 'Aucun aperçu pour le moment',
+      emptyText: s.stale ? "Le formulaire ou le modèle a changé. Cliquez sur « Aperçu » pour régénérer la quittance avant de l'envoyer." : "Remplissez le formulaire puis cliquez sur « Aperçu » pour vérifier la quittance avant de l'envoyer.",
+      previewStatus: statusMap[s.phase],
+      pageOpacity: locked ? '0.7' : '1',
+      doc: {nom:v.nom, adrLoc:v.adrLoc, adrLog:v.adrLog, email:v.email, debut:fmtDate(pv), fin:fmtDate(pf), paiement:fmtDate(pp),
+        loyer:la.n!=null?fmtEur(la.n):'', charges:ca.n!=null?fmtEur(ca.n):'', total, emis:fmtDate(new Date())}
+    };
+  }
+}
+</script>
+</body>
+</html>
