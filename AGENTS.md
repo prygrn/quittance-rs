@@ -140,6 +140,10 @@ Keep code, identifiers, and technical terms in their original form.
 Rust code follows rustc and clippy naming conventions, with snake_case functions, variables, modules, and source files.
 Rust crate directories and package names use kebab-case.
 
+## Project — typescript-inference
+
+As an exception to the rule "Add explicit types to all variables and function signatures.", a variable declared inside a function body may rely on type inference instead of an explicit type annotation.
+
 ## Project — typescript
 
 Enable strict type checking.

@@ -1,0 +1,1 @@
+As an exception to the rule "Add explicit types to all variables and function signatures.", a variable declared inside a function body may rely on type inference instead of an explicit type annotation.
