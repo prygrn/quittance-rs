@@ -1,7 +1,15 @@
+import { invoke } from "@tauri-apps/api/core";
+
 import "./receipt-screen.css";
 import { mountReceiptScreen } from "./mount-receipt-screen";
-import { UNCONNECTED_GATEWAY } from "./unconnected-gateway";
+import type { ReceiptGateway } from "./receipt-gateway";
+import { createTauriReceiptGateway } from "./tauri-receipt-gateway";
 
-mountReceiptScreen({ root: document, gateway: UNCONNECTED_GATEWAY }).catch((error: unknown) => {
+const gateway: ReceiptGateway = createTauriReceiptGateway({
+  invokeCommand: invoke,
+  now: (): Date => new Date(),
+});
+
+mountReceiptScreen({ root: document, gateway }).catch((error: unknown): void => {
   console.error("[UI_MOUNT_FAILED] receipt screen could not be mounted", error);
 });
