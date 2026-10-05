@@ -41,6 +41,30 @@ fn render_with_signature(signature_data_uri: &str) -> Result<String, TemplateErr
     )
 }
 
+/// Texte d'une règle CSS, de son sélecteur à la première accolade fermante.
+fn css_rule<'html>(html: &'html str, selector: &str) -> &'html str {
+    let start = html
+        .find(selector)
+        .unwrap_or_else(|| panic!("missing CSS rule `{selector}`"));
+    let length = html[start..]
+        .find('}')
+        .unwrap_or_else(|| panic!("unclosed CSS rule `{selector}`"));
+    &html[start..start + length]
+}
+
+/// Valeur de la propriété `margin` de la règle `@page`.
+fn printed_page_margin(html: &str) -> &str {
+    let page_rule = css_rule(html, "@page");
+    let value_start = page_rule
+        .find("margin:")
+        .expect("`@page` must set a margin")
+        + "margin:".len();
+    let value_length = page_rule[value_start..]
+        .find(';')
+        .expect("`@page` margin must end with a semicolon");
+    page_rule[value_start..value_start + value_length].trim()
+}
+
 fn assert_each_signature_is_invalid(results: &[Result<String, TemplateError>]) {
     for result in results {
         assert!(
@@ -597,4 +621,15 @@ fn given_single_digit_issue_day_and_month_when_rendering_then_issue_date_is_zero
 
     // Assert
     assert!(html.contains(", le 05/03/2026"));
+}
+
+#[test]
+fn given_receipt_when_rendering_then_screen_display_keeps_the_printed_page_margin() {
+    let receipt = sample_receipt();
+
+    let html = render_standard(&receipt);
+
+    let screen_rule = css_rule(&html, "@media screen");
+    assert!(screen_rule.contains("margin"));
+    assert!(screen_rule.contains(printed_page_margin(&html)));
 }
