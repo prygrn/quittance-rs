@@ -32,6 +32,7 @@ build-debug:
 
 test-unit:
 	cargo test --workspace --lib --bins
+	cargo test --workspace --doc
 	npx vitest run --passWithNoTests
 
 test: test-unit
