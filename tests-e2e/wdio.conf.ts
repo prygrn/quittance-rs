@@ -57,7 +57,7 @@ export const config: WebdriverIO.Config = {
     },
   ],
   // L'affichage virtuel est fourni par xvfb-run (Makefile), pas par WebdriverIO.
-  displayServerEnabled: false,
+  autoXvfb: false,
   logLevel: "warn",
   reporters: ["spec"],
   framework: "mocha",
