@@ -84,6 +84,17 @@ make setup        # dépendances npm, hooks git (.githooks)
 | `make msrv-check`       | Compile avec le `rust-version` du `Cargo.toml` (rustup requis)  |
 | `make ci`               | Toute la chaîne, comme en CI                                    |
 
+### Lancer l'application
+
+```bash
+npx tauri dev                  # front servi par Vite (port 5173), .env dans target/debug/
+npx tauri build --no-bundle    # exécutable target/release/quittance-app, .env à côté
+```
+
+### Content Security Policy
+
+La CSP de `src-tauri/tauri.conf.json` n'autorise que les scripts et styles de l'app et les appels IPC de Tauri. L'aperçu est une `iframe srcdoc` qui hérite de cette CSP : `style-src` accepte donc les styles inline et `img-src` les images `data:` (signature) du HTML de la quittance. `index.html` ne doit contenir aucune balise `<style>` : Tauri ajouterait un nonce à `style-src`, ce qui désactive `'unsafe-inline'` et casse l'aperçu. La CSP ne s'applique qu'à l'app construite ; avec `tauri dev`, la page vient directement du serveur Vite.
+
 ### Workflow test-first
 
 Pour chaque feature : API publique en stubs et suite complète de tests unitaires d'abord (commit `test(<scope>): ...`, tests rouges), puis implémentation jusqu'au vert (commit `feat(<scope>): ...`). Les hooks `commit-msg` et `pre-push` de `.githooks/` sont des wrappers suivis par git : ils lancent les hooks du kernel de la worktree courante (`.agents/hooks/`) et bloquent si le submodule est absent. Le hook `commit-msg` vérifie le format du message, lance `make quality` et `make test`, et bloque en cas d'échec ; un commit de type `test` tolère des tests rouges. Le hook `pre-push` refuse tout push sur `main` ou `master`.
