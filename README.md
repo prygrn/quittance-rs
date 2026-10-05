@@ -54,12 +54,22 @@ La documentation du comportement, ce sont les tests : chaque crate et chaque mod
 
 Copier `.env.example` en `.env` et le compléter : identité du bailleur, chemin de l'image de signature, chemin de Chromium, serveur SMTP. Le bailleur reçoit chaque quittance en copie cachée, qui sert d'archive.
 
+### Emplacement du fichier `.env`
+
+L'application lit le fichier `.env` placé **dans le même dossier que son exécutable** (en développement : `target/debug/` ou `target/release/`). Elle le relit à chaque aperçu et à chaque envoi.
+
+- Une variable déjà définie dans l'environnement au lancement l'emporte sur celle du fichier.
+- Un fichier absent n'est pas une erreur : seules les variables manquantes sont signalées.
+- L'aperçu n'exige que le bailleur (`LANDLORD_*`) et `SIGNATURE_PATH`. `CHROME_PATH` et `SMTP_*` ne sont exigés qu'à l'envoi.
+- Une valeur entre guillemets simples est prise littéralement ; entre guillemets doubles ou sans guillemets, `$NOM` est remplacé par une variable et `\` échappe le caractère suivant. Écrire donc `SMTP_PASSWORD` entre guillemets simples (une apostrophe s'y écrit `'\''`).
+
 ## Développement
 
 Prérequis : Rust stable, Node ≥ 22.12, Chromium ou Chrome, Docker (Mailpit pour les tests d'intégration), dépendances système de [Tauri sous Linux](https://tauri.app/start/prerequisites/).
 
 ```bash
 git submodule update --init
+make system-deps  # bibliothèques système de Tauri (Debian, Ubuntu ; sudo)
 make setup        # dépendances npm, hooks git (.githooks)
 ```
 

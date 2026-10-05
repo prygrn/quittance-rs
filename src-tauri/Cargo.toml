@@ -1,0 +1,25 @@
+[package]
+name = "quittance-app"
+version = "0.1.0"
+description = "Application desktop de quittances de loyer : configuration et orchestration des crates de feature"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+dotenvy = "0.15.7"
+quittance-core = { path = "../crates/quittance-core" }
+quittance-mailer = { path = "../crates/quittance-mailer" }
+quittance-pdf = { path = "../crates/quittance-pdf" }
+quittance-signature = { path = "../crates/quittance-signature" }
+quittance-template = { path = "../crates/quittance-template" }
+serde = { version = "1.0.229", features = ["derive"] }
+tauri = { version = "2.11.6", features = [] }
