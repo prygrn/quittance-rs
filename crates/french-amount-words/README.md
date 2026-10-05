@@ -6,6 +6,12 @@ graphie traditionnelle.
 Le crate est autonome : il ne dépend d'aucune autre bibliothèque que la bibliothèque standard.
 Il sert typiquement à reporter une somme en lettres sur une quittance, une facture ou un chèque.
 
+## Installation
+
+```sh
+cargo add french-amount-words
+```
+
 ## Usage
 
 ```rust

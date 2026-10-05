@@ -3,7 +3,21 @@ use std::fmt;
 use crate::MAX_VALUE;
 
 /// Échec de conversion d'un nombre ou d'un montant en lettres.
+///
+/// Un `match` hors du crate doit prévoir un bras `_`, afin que de nouvelles variantes puissent
+/// être ajoutées sans rupture de compatibilité :
+///
+/// ```compile_fail,E0004
+/// use french_amount_words::AmountWordsError;
+///
+/// fn too_large_value(error: &AmountWordsError) -> u64 {
+///     match error {
+///         AmountWordsError::ValueTooLarge { value } => *value,
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AmountWordsError {
     /// La valeur dépasse [`crate::MAX_VALUE`].
     ValueTooLarge {
