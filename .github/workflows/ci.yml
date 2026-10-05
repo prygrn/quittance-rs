@@ -84,6 +84,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: make setup
+      - run: make e2e-deps
       - run: make build-release
       - run: make test-integration
       - run: make test-e2e
