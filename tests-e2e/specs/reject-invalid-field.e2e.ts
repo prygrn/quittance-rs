@@ -4,8 +4,7 @@ import { fillReceiptForm } from "../support/fill-receipt-form";
 import { MAILPIT_CLIENT } from "../support/mailpit-client";
 import { openReceiptScreen } from "../support/open-receipt-screen";
 import { SAMPLE_RECEIPT } from "../support/sample-receipt";
-
-const ERROR_TIMEOUT_MS = 5_000;
+import { TIMEOUTS_MS } from "../support/timeouts-ms";
 
 describe("rejecting an invalid field", () => {
   beforeEach(async () => {
@@ -19,7 +18,7 @@ describe("rejecting an invalid field", () => {
     await $("#preview-button").click();
 
     const fieldError = $("#tenant-email-error");
-    await fieldError.waitForDisplayed({ timeout: ERROR_TIMEOUT_MS });
+    await fieldError.waitForDisplayed({ timeout: TIMEOUTS_MS.fieldError });
     assert.notEqual(
       (await fieldError.getText()).trim(),
       "",

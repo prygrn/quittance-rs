@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+import { MAILPIT } from "./mailpit";
 import { TEST_LANDLORD } from "./test-landlord";
 
 const SIGNATURE_PATH = fileURLToPath(
@@ -29,8 +30,8 @@ export function appEnvironment(): Readonly<Record<string, string>> {
     LANDLORD_CITY: TEST_LANDLORD.city,
     SIGNATURE_PATH,
     CHROME_PATH: requireChromePath(),
-    SMTP_HOST: "127.0.0.1",
-    SMTP_PORT: "1025",
+    SMTP_HOST: MAILPIT.host,
+    SMTP_PORT: String(MAILPIT.smtpPort),
     SMTP_SECURITY: "none",
   };
 }

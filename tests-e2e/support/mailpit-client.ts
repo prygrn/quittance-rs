@@ -1,7 +1,8 @@
 import { JSON_READER } from "./json-reader";
+import { MAILPIT } from "./mailpit";
 
 // API HTTP v1 du Mailpit local, celui du service CI ou du conteneur lancé en local.
-const MAILPIT_API_URL = "http://127.0.0.1:8025/api/v1";
+const MAILPIT_API_URL = `http://${MAILPIT.host}:${MAILPIT.apiPort}/api/v1`;
 
 /** Message reçu par Mailpit, réduit aux données vérifiées par les scénarios. */
 export interface MailpitMessage {
@@ -31,7 +32,7 @@ async function request(options: {
     response = await fetch(url, { method: options.method });
   } catch (err: unknown) {
     throw new Error(
-      `[E2E_MAILPIT_UNREACHABLE] ${options.method} ${url} failed: is Mailpit running on 127.0.0.1 (SMTP 1025, API 8025)?`,
+      `[E2E_MAILPIT_UNREACHABLE] ${options.method} ${url} failed: is Mailpit running on ${MAILPIT.host} (SMTP ${MAILPIT.smtpPort}, API ${MAILPIT.apiPort})?`,
       { cause: err },
     );
   }

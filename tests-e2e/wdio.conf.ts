@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { appEnvironment } from "./support/app-environment";
+import { TIMEOUTS_MS } from "./support/timeouts-ms";
 
 // Binaire produit par `tauri build --no-bundle` (cible `make test-e2e`), front embarqué.
 const APPLICATION_PATH = fileURLToPath(new URL("../target/release/quittance-app", import.meta.url));
@@ -63,7 +64,7 @@ export const config: WebdriverIO.Config = {
   framework: "mocha",
   mochaOpts: {
     ui: "bdd",
-    timeout: 120_000,
+    timeout: TIMEOUTS_MS.scenario,
   },
   beforeSession: startTauriDriver,
   afterSession: stopTauriDriver,

@@ -5,11 +5,8 @@ import { MAILPIT_CLIENT } from "../support/mailpit-client";
 import { openReceiptScreen } from "../support/open-receipt-screen";
 import { SAMPLE_RECEIPT } from "../support/sample-receipt";
 import { TEST_LANDLORD } from "../support/test-landlord";
+import { TIMEOUTS_MS } from "../support/timeouts-ms";
 
-const PREVIEW_TIMEOUT_MS = 30_000;
-// Chromium imprime le PDF avant l'envoi SMTP.
-const SEND_TIMEOUT_MS = 60_000;
-const DELIVERY_TIMEOUT_MS = 10_000;
 const PDF_SIGNATURE = "%PDF-";
 
 describe("sending a receipt", () => {
@@ -25,7 +22,7 @@ describe("sending a receipt", () => {
     await $("#preview-button").click();
 
     const previewFrame = $("#preview-frame");
-    await $("#preview-page").waitForDisplayed({ timeout: PREVIEW_TIMEOUT_MS });
+    await $("#preview-page").waitForDisplayed({ timeout: TIMEOUTS_MS.preview });
     const previewHtml = await previewFrame.getAttribute("srcdoc");
     assert.ok(previewHtml !== null, "the preview frame should hold the receipt HTML");
     [
@@ -45,12 +42,12 @@ describe("sending a receipt", () => {
     });
 
     const sendButton = $("#send-button");
-    await sendButton.waitForEnabled({ timeout: PREVIEW_TIMEOUT_MS });
+    await sendButton.waitForEnabled({ timeout: TIMEOUTS_MS.preview });
     await sendButton.click();
-    await $("#send-success").waitForDisplayed({ timeout: SEND_TIMEOUT_MS });
+    await $("#send-success").waitForDisplayed({ timeout: TIMEOUTS_MS.send });
 
     await browser.waitUntil(async () => (await MAILPIT_CLIENT.listMessageIds()).length > 0, {
-      timeout: DELIVERY_TIMEOUT_MS,
+      timeout: TIMEOUTS_MS.delivery,
       timeoutMsg: "[E2E_MAIL_NOT_RECEIVED] Mailpit received no message after the send",
     });
     const messageIds = await MAILPIT_CLIENT.listMessageIds();
