@@ -252,6 +252,45 @@ describe("createTauriReceiptGateway", () => {
     });
   });
 
+  it.each<{
+    description: string;
+    call: (gateway: ReceiptGateway) => Promise<unknown>;
+    response: unknown;
+    content: string;
+  }>([
+    {
+      description: "template labels",
+      call: (gateway) => gateway.listTemplates(),
+      response: [{ id: "standard", label: "Quittance de Jeanne Martin" }, { id: 1 }],
+      content: "Jeanne Martin",
+    },
+    {
+      description: "preview html",
+      call: (gateway) => gateway.renderPreview(previewRequest()),
+      response: [PREVIEW_HTML],
+      content: "Quittance de loyer",
+    },
+    {
+      description: "send details",
+      call: (gateway) => gateway.sendReceipt(previewRequest()),
+      response: "sent to jeanne.martin@example.fr",
+      content: "jeanne.martin@example.fr",
+    },
+  ])(
+    "keeps the $description of a malformed response out of the error",
+    async ({ call, response, content }) => {
+      // Arrange
+      const { gateway } = createGateway({ response: () => Promise.resolve(response) });
+
+      // Act
+      const reason: unknown = await call(gateway).catch((error: unknown) => error);
+
+      // Assert
+      expect(reason).toBeInstanceOf(Error);
+      expect((reason as Error).message).not.toContain(content);
+    },
+  );
+
   it("reads the clock at each call to date the receipt", async () => {
     // Arrange
     let currentTime = new Date(2026, 9, 5, 23, 59);
