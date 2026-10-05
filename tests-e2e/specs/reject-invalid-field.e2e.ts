@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { assertMailboxStaysEmpty } from "../support/assert-mailbox-stays-empty";
 import { fillReceiptForm } from "../support/fill-receipt-form";
 import { MAILPIT_CLIENT } from "../support/mailpit-client";
 import { openReceiptScreen } from "../support/open-receipt-screen";
@@ -17,10 +18,9 @@ describe("rejecting an invalid field", () => {
 
     await $("#preview-button").click();
 
-    const fieldError = $("#tenant-email-error");
-    await fieldError.waitForDisplayed({ timeout: TIMEOUTS_MS.fieldError });
+    await $("#tenant-email-error").waitForDisplayed({ timeout: TIMEOUTS_MS.fieldError });
     assert.notEqual(
-      (await fieldError.getText()).trim(),
+      (await $("#tenant-email-error .field-error-text").getText()).trim(),
       "",
       "the field error should explain the problem",
     );
@@ -32,6 +32,6 @@ describe("rejecting an invalid field", () => {
     );
     assert.equal(await $("#preview-page").isDisplayed(), false, "no preview should be rendered");
     assert.equal(await $("#send-button").isEnabled(), false, "sending should stay unavailable");
-    assert.deepEqual(await MAILPIT_CLIENT.listMessageIds(), [], "no email should be sent");
+    await assertMailboxStaysEmpty();
   });
 });

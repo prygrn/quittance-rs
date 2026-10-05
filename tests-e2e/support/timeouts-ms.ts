@@ -12,4 +12,6 @@ export const TIMEOUTS_MS = {
   send: 60_000,
   /** Arrivée du message dans Mailpit après un envoi confirmé. */
   delivery: 10_000,
+  /** Fenêtre pendant laquelle Mailpit doit rester vide quand aucun envoi n'est attendu. */
+  silentMailbox: 3_000,
 } as const;
