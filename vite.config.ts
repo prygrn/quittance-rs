@@ -13,7 +13,8 @@ export default defineConfig({
     },
   },
   build: {
-    // Tauri affiche le front dans WebKit (Linux, macOS) et WebView2, basé sur Chromium (Windows).
-    target: ["safari13", "chrome105"],
+    // Même cible que `tsconfig.json` : le code utilise des API ES2022 comme `Object.hasOwn`,
+    // que la transpilation ne remplace pas, absentes des WebKit antérieurs à Safari 15.4.
+    target: "es2022",
   },
 });
