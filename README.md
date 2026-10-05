@@ -71,6 +71,7 @@ Prérequis : Rust stable, Node ≥ 22.12, Chromium ou Chrome, Docker (Mailpit po
 git submodule update --init
 make system-deps  # bibliothèques système de Tauri (Debian, Ubuntu ; sudo)
 make setup        # dépendances npm, hooks git (.githooks)
+make e2e-deps     # tests e2e : webkit2gtk-driver, xvfb (sudo), tauri-driver (cargo install)
 ```
 
 | Commande                | Effet                                                           |
@@ -80,9 +81,22 @@ make setup        # dépendances npm, hooks git (.githooks)
 | `make test-unit`        | Tests unitaires Rust et TS                                      |
 | `make test`             | Alias de `make test-unit`, appelé par le hook du kernel         |
 | `make test-integration` | Tests d'intégration (Chromium, Mailpit)                         |
-| `make test-e2e`         | Tests end-to-end de l'app                                       |
+| `make test-e2e`         | Tests end-to-end de l'app (tauri-driver, WebdriverIO, Mailpit)  |
 | `make msrv-check`       | Compile avec le `rust-version` du `Cargo.toml` (rustup requis)  |
 | `make ci`               | Toute la chaîne, comme en CI                                    |
+
+### Tests e2e
+
+`make test-e2e` construit l'app en release (`tauri build --no-bundle`, front embarqué), puis pilote son interface sous `xvfb-run` avec WebdriverIO et tauri-driver (`tests-e2e/`). L'app y reçoit sa configuration par l'environnement : bailleur de test, signature `src-tauri/fixtures/signature.png`, envoi en clair vers Mailpit. Il faut donc :
+
+- les outils de `make e2e-deps` ;
+- `CHROME_PATH`, chemin de Chromium ou Chrome ;
+- un Mailpit local, que chaque scénario vide avant de vérifier le mail reçu :
+
+```bash
+docker run -d --rm --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.31.3
+CHROME_PATH=/usr/bin/google-chrome make test-e2e
+```
 
 ### Workflow test-first
 
