@@ -1,5 +1,10 @@
 # quittance-rs
 
+[![CI](https://github.com/prygrn/quittance-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/prygrn/quittance-rs/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/v/tag/prygrn/quittance-rs?label=version&sort=semver)](CHANGELOG.md)
+[![Licence : MIT](https://img.shields.io/github/license/prygrn/quittance-rs)](LICENSE)
+[![MSRV 1.88](https://img.shields.io/badge/MSRV-1.88-blue)](Cargo.toml)
+
 Générateur de quittances de loyer, pour usage personnel (bailleur particulier).
 
 ## Fonctionnement
