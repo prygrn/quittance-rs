@@ -1,8 +1,16 @@
-import type { TemplateInfo } from "./api";
+import type { ReceiptInput, TemplateInfo } from "./api";
 import type { InvokeCommand } from "./invoke-command";
 import type { ReceiptGateway } from "./receipt-gateway";
 import type { PreviewRequest } from "./screen-state";
 import { toLocalIsoDate } from "./to-local-iso-date";
+
+/** Arguments communs de `preview_receipt` et `send_receipt`, en camelCase côté UI. */
+type ReceiptCommandArguments = {
+  readonly templateId: string;
+  readonly input: ReceiptInput;
+  /** Date locale du jour au format `YYYY-MM-DD`, reprise dans « Fait à …, le … ». */
+  readonly issueDate: string;
+};
 
 /**
  * Passerelle vers les commandes Tauri `list_templates`, `preview_receipt` et
@@ -14,14 +22,14 @@ export function createTauriReceiptGateway(dependencies: {
 }): ReceiptGateway {
   const { invokeCommand, now } = dependencies;
   // La date d'émission (« Fait à …, le … ») est celle du jour de l'appel, en heure locale.
-  const receiptArguments = (request: PreviewRequest): Readonly<Record<string, unknown>> => ({
+  const receiptArguments = (request: PreviewRequest): ReceiptCommandArguments => ({
     templateId: request.templateId,
     input: request.input,
     issueDate: toLocalIsoDate(now()),
   });
 
   return {
-    listTemplates: async () => {
+    listTemplates: async (): Promise<readonly TemplateInfo[]> => {
       const response = await invokeCommand("list_templates", {});
       if (!isTemplateInfoList(response)) {
         throw invalidResponseError({
@@ -32,14 +40,14 @@ export function createTauriReceiptGateway(dependencies: {
       }
       return response;
     },
-    renderPreview: async (request: PreviewRequest) => {
+    renderPreview: async (request: PreviewRequest): Promise<string> => {
       const response = await invokeCommand("preview_receipt", receiptArguments(request));
       if (typeof response !== "string") {
         throw invalidResponseError({ command: "preview_receipt", expected: "string", response });
       }
       return response;
     },
-    sendReceipt: async (request: PreviewRequest) => {
+    sendReceipt: async (request: PreviewRequest): Promise<void> => {
       const response = await invokeCommand("send_receipt", receiptArguments(request));
       if (response !== null) {
         throw invalidResponseError({ command: "send_receipt", expected: "null", response });
@@ -53,10 +61,11 @@ function isTemplateInfoList(value: unknown): value is readonly TemplateInfo[] {
 }
 
 function isTemplateInfo(value: unknown): value is TemplateInfo {
-  return hasOwnString(value, "id") && hasOwnString(value, "label");
+  return hasOwnString({ value, field: "id" }) && hasOwnString({ value, field: "label" });
 }
 
-function hasOwnString(value: unknown, field: string): boolean {
+function hasOwnString(candidate: { readonly value: unknown; readonly field: string }): boolean {
+  const { value, field } = candidate;
   return (
     typeof value === "object" &&
     value !== null &&

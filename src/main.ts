@@ -7,9 +7,9 @@ import { createTauriReceiptGateway } from "./tauri-receipt-gateway";
 
 const gateway: ReceiptGateway = createTauriReceiptGateway({
   invokeCommand: invoke,
-  now: () => new Date(),
+  now: (): Date => new Date(),
 });
 
-mountReceiptScreen({ root: document, gateway }).catch((error: unknown) => {
+mountReceiptScreen({ root: document, gateway }).catch((error: unknown): void => {
   console.error("[UI_MOUNT_FAILED] receipt screen could not be mounted", error);
 });
