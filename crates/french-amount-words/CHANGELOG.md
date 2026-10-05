@@ -14,3 +14,5 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le cr
   centimes.
 - `MAX_VALUE` : plus grande valeur convertible (`999_999_999_999`).
 - `AmountWordsError::ValueTooLarge` : erreur renvoyée au-delà de `MAX_VALUE`.
+- `AmountWordsError` est `#[non_exhaustive]` : un `match` hors du crate doit prévoir un bras `_`,
+  ce qui permet d'ajouter des variantes sans rupture de compatibilité.

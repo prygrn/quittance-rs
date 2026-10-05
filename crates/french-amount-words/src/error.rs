@@ -17,6 +17,7 @@ use crate::MAX_VALUE;
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AmountWordsError {
     /// La valeur dépasse [`crate::MAX_VALUE`].
     ValueTooLarge {
