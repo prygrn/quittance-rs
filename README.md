@@ -44,9 +44,10 @@ Une feature = un crate (ou un module TS) isolé, testable seul. Les crates de fe
 | `crates/quittance-signature` | Chargement et validation de l'image de signature |
 | `crates/quittance-pdf`       | Conversion HTML → PDF via Chromium headless      |
 | `crates/quittance-mailer`    | Construction et envoi de l'email (SMTP)          |
-| `crates/french-amount-words` | Montant en toutes lettres, lib autonome          |
 | `src-tauri/`                 | App desktop : configuration, orchestration       |
 | `src/`                       | Interface (Vanilla TS + Vite)                    |
+
+`quittance-template` écrit le montant en toutes lettres avec le crate externe [`french-amount-words`](https://crates.io/crates/french-amount-words).
 
 La documentation du comportement, ce sont les tests : chaque crate et chaque module portent leurs tests unitaires.
 
