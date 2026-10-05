@@ -1,5 +1,5 @@
 # Point d'entrée unique des commandes de développement, partagé par le hook git et la CI.
-.PHONY: setup system-deps format fmt-check lint quality build-debug test-unit test build-release test-integration test-e2e ci msrv-version msrv-check
+.PHONY: setup system-deps e2e-deps format fmt-check lint quality build-debug test-unit test build-release test-integration build-e2e-app test-e2e ci msrv-version msrv-check
 
 setup:
 	npm ci
@@ -9,6 +9,14 @@ setup:
 system-deps:
 	sudo apt-get update
 	sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev
+
+TAURI_DRIVER_VERSION := 2.1.0
+
+# Outils des tests e2e (Debian, Ubuntu) : WebDriver de WebKitGTK, affichage virtuel, tauri-driver.
+e2e-deps:
+	sudo apt-get update
+	sudo apt-get install -y webkit2gtk-driver xvfb
+	cargo install --locked tauri-driver --version $(TAURI_DRIVER_VERSION)
 
 format:
 	cargo fmt --all
@@ -48,9 +56,15 @@ test-integration:
 		echo "test-integration: aucun test d'intégration pour l'instant"; \
 	fi
 
-# Branché en F8 (tauri-driver + WebdriverIO).
-test-e2e:
-	@echo "test-e2e: aucun test e2e pour l'instant"
+# Binaire release lancé par les tests e2e : contrairement à `cargo build`, la CLI Tauri
+# embarque le front (vite build) au lieu de pointer vers le serveur de développement.
+build-e2e-app:
+	npx tauri build --no-bundle
+
+# Requiert `make e2e-deps`, CHROME_PATH et un Mailpit local (SMTP 1025, API 8025), vidé
+# avant chaque scénario.
+test-e2e: build-e2e-app
+	xvfb-run --auto-servernum npx wdio run tests-e2e/wdio.conf.ts
 
 # Affiche le rust-version déclaré dans Cargo.toml ; échoue s'il est introuvable.
 msrv-version:
