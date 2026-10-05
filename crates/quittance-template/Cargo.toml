@@ -11,7 +11,7 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-french-amount-words = "0.1.0"
+french-amount-words = "0.1.1"
 minijinja = "2.24.0"
 quittance-core = { path = "../quittance-core" }
 thiserror = "2.0.21"

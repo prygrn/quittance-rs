@@ -1125,9 +1125,9 @@ dependencies = [
 
 [[package]]
 name = "french-amount-words"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f02eb9a7e0287db8c11b9d49792099c81ff19f80c8c72a4da998592b531505c6"
+checksum = "8cb42203b475cee9b0e394b24a2d60c8e3db85bbf730622a1b27f39d0bf0bb43"
 
 [[package]]
 name = "futures-channel"
