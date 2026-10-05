@@ -28,6 +28,8 @@ export default tseslint.config(
         { selector: "typeLike", format: ["PascalCase"] },
         { selector: "enumMember", format: ["PascalCase"] },
         { selector: "objectLiteralProperty", format: null },
+        // Clé imposée par un protocole externe, comme la capacité WebDriver `tauri:options`.
+        { selector: "typeProperty", modifiers: ["requiresQuotes"], format: null },
         { selector: "import", format: null },
       ],
     },

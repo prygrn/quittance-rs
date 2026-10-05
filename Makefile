@@ -23,6 +23,7 @@ lint:
 	cargo clippy --workspace --all-targets -- -D warnings
 	npx eslint .
 	npx tsc --noEmit
+	npx tsc --noEmit -p tests-e2e
 
 quality: fmt-check lint
 	.agents/scripts/compile-agents --check
