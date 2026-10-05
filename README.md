@@ -85,6 +85,17 @@ make e2e-deps     # tests e2e : webkit2gtk-driver, xvfb (sudo), tauri-driver (ca
 | `make msrv-check`       | Compile avec le `rust-version` du `Cargo.toml` (rustup requis)  |
 | `make ci`               | Toute la chaîne, comme en CI                                    |
 
+### Lancer l'application
+
+```bash
+npx tauri dev                  # front servi par Vite (port 5173), .env dans target/debug/
+npx tauri build --no-bundle    # exécutable target/release/quittance-app, .env à côté
+```
+
+### Content Security Policy
+
+La CSP de `src-tauri/tauri.conf.json` n'autorise que les scripts et styles de l'app et les appels IPC de Tauri. L'aperçu est une `iframe srcdoc` qui hérite de cette CSP : `style-src` accepte donc les styles inline et `img-src` les images `data:` (signature) du HTML de la quittance. `index.html` ne doit contenir aucune balise `<style>` : Tauri ajouterait un nonce à `style-src`, ce qui désactive `'unsafe-inline'` et casse l'aperçu. La CSP ne s'applique qu'à l'app construite ; avec `tauri dev`, la page vient directement du serveur Vite.
+
 ### Tests e2e
 
 `make test-e2e` construit l'app en release (`tauri build --no-bundle`, front embarqué), puis pilote son interface sous `xvfb-run` avec WebdriverIO et tauri-driver (`tests-e2e/`). L'app y reçoit sa configuration par l'environnement : bailleur de test, signature `src-tauri/fixtures/signature.png`, envoi en clair vers Mailpit. Il faut donc :
