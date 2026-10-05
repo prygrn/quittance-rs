@@ -1,6 +1,6 @@
 [package]
 name = "quittance-app"
-version = "0.1.0"
+version = "1.0.0"
 description = "Application desktop de quittances de loyer : configuration et orchestration des crates de feature"
 edition.workspace = true
 rust-version.workspace = true
