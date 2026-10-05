@@ -23,6 +23,12 @@
     font-size: 10.5pt;
     line-height: 1.45;
   }
+  /* @page ne s'applique qu'à l'impression : l'aperçu à l'écran reprend sa marge verticale. */
+  @media screen {
+    body {
+      margin: 20mm auto;
+    }
+  }
   h1 {
     margin: 0;
     font-size: 20pt;

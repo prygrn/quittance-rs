@@ -24,6 +24,10 @@ const FORMATTED_TOTAL: &str = "700,50\u{a0}€";
 
 /// Mention légale de pied de quittance, texte exact décidé par le produit.
 const LEGAL_NOTICE: &str = "En cas de congé précédemment donné, cette quittance représenterait l'indemnité d'occupation et ne saurait être considérée comme un titre de location. Cette quittance annule tous les reçus qui auraient pu être donnés pour acompte versé sur le présent terme, même si ces reçus portent une date postérieure à la date ci-contre. Le paiement de la présente quittance n'emporte pas présomption de paiement des termes antérieurs.";
+/// Ouvertures des règles CSS de la page imprimée et de l'affichage à l'écran ;
+/// l'accolade évite de confondre la règle avec sa mention dans un commentaire.
+const PAGE_RULE: &str = "@page {";
+const SCREEN_RULE: &str = "@media screen {";
 /// Tentatives de sortie du contexte texte, y compris depuis le bloc `<style>`.
 const MARKUP_INJECTIONS: [&str; 2] = [
     "\"><script>alert(1)</script>",
@@ -39,6 +43,37 @@ fn render_with_signature(signature_data_uri: &str) -> Result<String, TemplateErr
         &sample_issue(),
         Some(signature_data_uri),
     )
+}
+
+/// Texte d'une règle CSS, de son sélecteur à la première accolade fermante.
+fn css_rule<'html>(html: &'html str, selector: &str) -> &'html str {
+    let start = html
+        .find(selector)
+        .unwrap_or_else(|| panic!("missing CSS rule `{selector}`"));
+    let length = html[start..]
+        .find('}')
+        .unwrap_or_else(|| panic!("unclosed CSS rule `{selector}`"));
+    &html[start..start + length]
+}
+
+/// Marges haute et basse déclarées par le raccourci `margin` d'une règle CSS.
+fn vertical_margins<'html>(rule: &'html str, selector: &str) -> (&'html str, &'html str) {
+    let value_start = rule
+        .find("margin:")
+        .unwrap_or_else(|| panic!("`{selector}` must set a margin"))
+        + "margin:".len();
+    let value_length = rule[value_start..]
+        .find(';')
+        .unwrap_or_else(|| panic!("`{selector}` margin must end with a semicolon"));
+    let values: Vec<&str> = rule[value_start..value_start + value_length]
+        .split_whitespace()
+        .collect();
+    match values.as_slice() {
+        [all] => (all, all),
+        [vertical, _] => (vertical, vertical),
+        [top, _, bottom] | [top, _, bottom, _] => (top, bottom),
+        _ => panic!("`{selector}` margin has an invalid value count: {values:?}"),
+    }
 }
 
 fn assert_each_signature_is_invalid(results: &[Result<String, TemplateError>]) {
@@ -597,4 +632,15 @@ fn given_single_digit_issue_day_and_month_when_rendering_then_issue_date_is_zero
 
     // Assert
     assert!(html.contains(", le 05/03/2026"));
+}
+
+#[test]
+fn given_receipt_when_rendering_then_screen_display_keeps_the_printed_page_margin() {
+    let receipt = sample_receipt();
+
+    let html = render_standard(&receipt);
+
+    let page_margins = vertical_margins(css_rule(&html, PAGE_RULE), PAGE_RULE);
+    let screen_margins = vertical_margins(css_rule(&html, SCREEN_RULE), SCREEN_RULE);
+    assert_eq!(screen_margins, page_margins);
 }
