@@ -44,8 +44,8 @@ impl DirectoryTenantProfileStorage {
         let path = self.file_path(id);
         let temporary_path = self.temporary_file_path(id)?;
         let result = synced_new_file(&temporary_path, contents)
-            .and_then(|()| place(&temporary_path, &path))
-            .map_err(|error| located(&path, error));
+            .map_err(|error| located(&temporary_path, error))
+            .and_then(|()| place(&temporary_path, &path).map_err(|error| located(&path, error)));
         // Nettoyage au mieux : après un renommage le fichier n'existe plus, et un fichier
         // temporaire restant n'est jamais lu comme une fiche.
         let _ = fs::remove_file(&temporary_path);
@@ -72,15 +72,21 @@ fn synced_new_file(path: &Path, contents: &str) -> io::Result<()> {
 }
 
 /// Met le fichier temporaire à la place de la fiche par un lien physique, qui échoue si la
-/// fiche existe déjà, contrairement à un renommage.
+/// fiche existe déjà, contrairement à un renommage. Un système de fichiers sans liens
+/// physiques (FAT32, exFAT) reçoit une écriture directe de la fiche, qui refuse elle aussi
+/// d'écraser une fiche existante mais n'est pas atomique.
 fn placed_without_overwrite(
     temporary_path: &Path,
     path: &Path,
     contents: &str,
     hard_link: impl FnOnce(&Path, &Path) -> io::Result<()>,
 ) -> io::Result<()> {
-    let _ = contents;
-    hard_link(temporary_path, path)
+    match hard_link(temporary_path, path) {
+        Err(error) if error.kind() != io::ErrorKind::AlreadyExists => {
+            synced_new_file(path, contents)
+        }
+        result => result,
+    }
 }
 
 /// Nom sans extension de chaque fichier `.toml` parmi les entrées d'un dossier. Une entrée
