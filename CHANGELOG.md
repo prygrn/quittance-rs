@@ -7,6 +7,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et l'app
 
 ## [Unreleased]
 
+### Added
+
+- Fiches locataire : une fiche enregistre le template, le locataire, l'adresse du logement, le loyer
+  et les charges, pour préremplir les quittances suivantes. Un fichier TOML par fiche, dans le
+  dossier `fiches/` placé à côté de l'exécutable.
+
 ## [1.0.1] - 2026-10-05
 
 ### Changed

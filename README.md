@@ -42,15 +42,16 @@ Une capture d'écran reste possible ; elle ne donne qu'une image marquée et de 
 
 Une feature = un crate (ou un module TS) isolé, testable seul. Les crates de feature ne dépendent que de `quittance-core` ; seule l'app Tauri (`src-tauri/`) les assemble.
 
-| Chemin                       | Rôle                                             |
-| ---------------------------- | ------------------------------------------------ |
-| `crates/quittance-core`      | Domaine : quittance, parties, période, montants  |
-| `crates/quittance-template`  | Sélection du template et rendu HTML              |
-| `crates/quittance-signature` | Chargement et validation de l'image de signature |
-| `crates/quittance-pdf`       | Conversion HTML → PDF via Chromium headless      |
-| `crates/quittance-mailer`    | Construction et envoi de l'email (SMTP)          |
-| `src-tauri/`                 | App desktop : configuration, orchestration       |
-| `src/`                       | Interface (Vanilla TS + Vite)                    |
+| Chemin                            | Rôle                                             |
+| --------------------------------- | ------------------------------------------------ |
+| `crates/quittance-core`           | Domaine : quittance, parties, période, montants  |
+| `crates/quittance-template`       | Sélection du template et rendu HTML              |
+| `crates/quittance-signature`      | Chargement et validation de l'image de signature |
+| `crates/quittance-pdf`            | Conversion HTML → PDF via Chromium headless      |
+| `crates/quittance-mailer`         | Construction et envoi de l'email (SMTP)          |
+| `crates/quittance-tenant-profile` | Fiches locataire : validation, fichiers TOML     |
+| `src-tauri/`                      | App desktop : configuration, orchestration       |
+| `src/`                            | Interface (Vanilla TS + Vite)                    |
 
 `quittance-template` écrit le montant en toutes lettres avec le crate externe [`french-amount-words`](https://crates.io/crates/french-amount-words).
 
@@ -68,6 +69,29 @@ L'application lit le fichier `.env` placé **dans le même dossier que son exéc
 - Un fichier absent n'est pas une erreur : seules les variables manquantes sont signalées.
 - L'aperçu n'exige que le bailleur (`LANDLORD_*`) et `SIGNATURE_PATH`. `CHROME_PATH` et `SMTP_*` ne sont exigés qu'à l'envoi.
 - Une valeur entre guillemets simples est prise littéralement ; entre guillemets doubles ou sans guillemets, `$NOM` est remplacé par une variable et `\` échappe le caractère suivant. Écrire donc `SMTP_PASSWORD` entre guillemets simples (une apostrophe s'y écrit `'\''`).
+
+## Fiches locataire
+
+Une fiche locataire évite de ressaisir chaque mois le même locataire. Elle enregistre tout ce qui préremplit une quittance : template, nom, adresse et email du locataire, adresse du logement, loyer et charges. La période et la date de paiement restent à saisir ; le bailleur reste dans `.env`.
+
+- **Dossier** : `fiches/`, **dans le même dossier que l'exécutable**, comme le `.env` (en développement : `target/debug/fiches/`). Il est créé au premier enregistrement ; tant qu'il n'existe pas, la liste est vide.
+- **Nommage** : un fichier `<id>.toml` par fiche. L'id dérive du nom du locataire : minuscules, accents français retirés (`é` → `e`, `ç` → `c`, `œ` → `oe`…), toute autre suite de caractères remplacée par `-`, sans `-` en tête ni en fin. « Hélène Dupont-Durand » devient `helene-dupont-durand.toml`.
+- **Collisions** : deux locataires dont les noms donnent le même id (« Jeanne Martin », « JEANNE MARTIN ») partagent la même fiche. L'application le signale à l'enregistrement et propose de remplacer la fiche existante.
+- **Format** : clés ci-dessous, toutes obligatoires, toute autre clé refusée. Les montants sont en euros à la française : écrits `"650,00"`, lus aussi sous la forme `"650"` ou `"50,5"`.
+
+```toml
+template_id = "standard"
+tenant_name = "Jeanne Martin"
+tenant_address = "8 rue Victor Hugo, 75011 Paris"
+tenant_email = "jeanne.martin@example.fr"
+property_address = "12 rue des Lilas, 75011 Paris"
+rent = "650,00"
+charges = "50,50"
+```
+
+- **Validation** : une fiche est vérifiée à l'enregistrement et au chargement, comme une quittance (email, adresses, montants) ; son `template_id` doit désigner un template existant. Une fiche illisible ou invalide reste listée sous son id et son chargement échoue avec un message d'erreur.
+- **Suppression, renommage** : l'interface n'en propose pas ; supprimer ou renommer le fichier à la main.
+- **Confidentialité** : les fiches contiennent des données personnelles ; `fiches/` est ignoré par git et ne doit jamais être commité.
 
 ## Développement
 
