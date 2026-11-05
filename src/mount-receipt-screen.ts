@@ -16,6 +16,7 @@ import {
   type PreviewRequest,
   type ScreenEvent,
 } from "./screen-state";
+import type { TenantProfileGateway } from "./tenant-profile-gateway";
 import { toCommandErrorCode } from "./to-command-error-code";
 
 const LOG_CODES = {
@@ -27,11 +28,13 @@ const LOG_CODES = {
 
 /**
  * Branche l'écran de quittance sur le balisage de `index.html` présent dans `root`,
- * puis charge la liste des modèles. La promesse se résout une fois cette liste affichée.
+ * puis charge la liste des modèles et celle des fiches locataire. La promesse se résout
+ * une fois ces listes affichées.
  */
 export async function mountReceiptScreen(options: {
   readonly root: ParentNode;
   readonly gateway: ReceiptGateway;
+  readonly tenantProfileGateway: TenantProfileGateway;
 }): Promise<void> {
   const { gateway } = options;
   const elements = findReceiptScreenElements(options.root);

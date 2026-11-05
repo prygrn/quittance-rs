@@ -11,6 +11,8 @@ describe("toCommandErrorCode", () => {
     "pdf",
     "mail",
     "config",
+    "tenantProfile",
+    "tenantProfileExists",
     "unknown",
   ])("reads the %s code from a command rejection", (code: CommandErrorCode) => {
     // Arrange

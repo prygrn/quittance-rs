@@ -2,13 +2,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import screenHtml from "../index.html?raw";
-import type { CommandErrorCode, ReceiptInput, TemplateInfo } from "./api";
+import type {
+  CommandErrorCode,
+  ReceiptInput,
+  TemplateInfo,
+  TenantProfileEntry,
+  TenantProfilePayload,
+} from "./api";
 import { COMMAND_ERROR_MESSAGES } from "./command-error-messages";
 import { FIELD_ERROR_MESSAGES } from "./field-error-messages";
 import { mountReceiptScreen } from "./mount-receipt-screen";
 import type { FieldErrorCode, ReceiptFormField, ReceiptFormValues } from "./receipt-form";
 import type { ReceiptGateway } from "./receipt-gateway";
 import type { PreviewRequest } from "./screen-state";
+import type { TenantProfileGateway } from "./tenant-profile-gateway";
 
 // Identifiants stables du balisage, partagés avec les futurs tests e2e.
 const FIELD_IDS: Readonly<Record<ReceiptFormField, string>> = {
@@ -27,6 +34,31 @@ const TEMPLATES: readonly TemplateInfo[] = [
   { id: "standard", label: "Standard" },
   { id: "compact", label: "Compact" },
 ];
+
+const TENANT_PROFILES: readonly TenantProfileEntry[] = [
+  { id: "jeanne-martin", label: "Jeanne Martin" },
+  { id: "leo-durand", label: "Léo Durand" },
+];
+
+const JEANNE_PROFILE: TenantProfilePayload = {
+  templateId: "compact",
+  tenantName: "Jeanne Martin",
+  tenantAddress: "8 rue Victor Hugo\n75011 Paris",
+  tenantEmail: "jeanne.martin@example.fr",
+  propertyAddress: "12 rue des Lilas\n75011 Paris",
+  rentCents: 65_000,
+  chargesCents: 5_050,
+};
+
+const LEO_PROFILE: TenantProfilePayload = {
+  templateId: "standard",
+  tenantName: "Léo Durand",
+  tenantAddress: "3 place Bellecour\n69002 Lyon",
+  tenantEmail: "leo.durand@example.fr",
+  propertyAddress: "5 rue Mercière\n69002 Lyon",
+  rentCents: 72_000,
+  chargesCents: 9_000,
+};
 
 // Saisie de la maquette (état « Aperçu chargé »), dates au format jj/mm/aaaa.
 const FILLED_VALUES: ReceiptFormValues = {
@@ -104,6 +136,22 @@ interface FakeGateway {
   readonly gateway: ReceiptGateway;
   readonly previewCalls: PendingCall<string>[];
   readonly sendCalls: PendingCall<void>[];
+  readonly tenantProfiles: FakeTenantProfileGateway;
+}
+
+interface PendingTenantProfileCall<Argument, Result> {
+  readonly argument: Argument;
+  readonly resolve: (value: Result) => void;
+  readonly reject: (reason: unknown) => void;
+}
+
+interface FakeTenantProfileGateway {
+  readonly gateway: TenantProfileGateway;
+  /** Répond la liste `TENANT_PROFILES` tant qu'un test ne la remplace pas. */
+  readonly list: ReturnType<typeof vi.fn<TenantProfileGateway["listTenantProfiles"]>>;
+  readonly loadCalls: PendingTenantProfileCall<string, TenantProfilePayload>[];
+  readonly createCalls: PendingTenantProfileCall<TenantProfilePayload, TenantProfileEntry>[];
+  readonly replaceCalls: PendingTenantProfileCall<TenantProfilePayload, TenantProfileEntry>[];
 }
 
 // Fake du backend : chaque commande reste en attente jusqu'à ce que le test la résolve.
@@ -121,14 +169,45 @@ function createFakeGateway(templates: Promise<readonly TemplateInfo[]>): FakeGat
         sendCalls.push({ request, resolve, reject });
       }),
   };
-  return { gateway, previewCalls, sendCalls };
+  return { gateway, previewCalls, sendCalls, tenantProfiles: createFakeTenantProfileGateway() };
+}
+
+// Fake des commandes de fiches : seule la liste répond d'elle-même, les autres attendent le test.
+function createFakeTenantProfileGateway(): FakeTenantProfileGateway {
+  const list = vi
+    .fn<TenantProfileGateway["listTenantProfiles"]>()
+    .mockResolvedValue(TENANT_PROFILES);
+  const loadCalls: PendingTenantProfileCall<string, TenantProfilePayload>[] = [];
+  const createCalls: PendingTenantProfileCall<TenantProfilePayload, TenantProfileEntry>[] = [];
+  const replaceCalls: PendingTenantProfileCall<TenantProfilePayload, TenantProfileEntry>[] = [];
+  const pending =
+    <Argument, Result>(calls: PendingTenantProfileCall<Argument, Result>[]) =>
+    (argument: Argument): Promise<Result> =>
+      new Promise<Result>((resolve, reject) => {
+        calls.push({ argument, resolve, reject });
+      });
+  const gateway: TenantProfileGateway = {
+    listTenantProfiles: list,
+    loadTenantProfile: pending(loadCalls),
+    createTenantProfile: pending(createCalls),
+    replaceTenantProfile: pending(replaceCalls),
+  };
+  return { gateway, list, loadCalls, createCalls, replaceCalls };
+}
+
+function mountFake(fake: FakeGateway): Promise<void> {
+  return mountReceiptScreen({
+    root: document,
+    gateway: fake.gateway,
+    tenantProfileGateway: fake.tenantProfiles.gateway,
+  });
 }
 
 async function mountScreen(
   templates: Promise<readonly TemplateInfo[]> = Promise.resolve(TEMPLATES),
 ): Promise<FakeGateway> {
   const fake = createFakeGateway(templates);
-  await mountReceiptScreen({ root: document, gateway: fake.gateway });
+  await mountFake(fake);
   return fake;
 }
 
@@ -311,7 +390,7 @@ describe("mountReceiptScreen: empty screen", () => {
     const fake = createFakeGateway(new Promise<readonly TemplateInfo[]>(() => undefined));
 
     // Act
-    void mountReceiptScreen({ root: document, gateway: fake.gateway });
+    void mountFake(fake);
     await settle();
 
     // Assert
@@ -332,7 +411,7 @@ describe("mountReceiptScreen: empty screen", () => {
     const fake = createFakeGateway(Promise.resolve(TEMPLATES));
 
     // Act
-    const mounting = mountReceiptScreen({ root: document, gateway: fake.gateway });
+    const mounting = mountFake(fake);
 
     // Assert
     await expect(mounting).rejects.toThrow("UI_MARKUP_MISMATCH");
@@ -887,5 +966,651 @@ describe("mountReceiptScreen: send failure", () => {
     expect(isShown("send-button")).toBe(true);
     expect(byId<HTMLButtonElement>("send-button").disabled).toBe(true);
     expect(statusText()).toBe("À régénérer");
+  });
+});
+
+// Fiche de Marie Dupont, enregistrée depuis la saisie `FILLED_VALUES` avec le modèle compact.
+const MARIE_PROFILE: TenantProfilePayload = {
+  templateId: "compact",
+  tenantName: "Marie Dupont",
+  tenantAddress: "12 rue des Lilas, appt 4B\n69003 Lyon",
+  tenantEmail: "marie.dupont@exemple.fr",
+  propertyAddress: "12 rue des Lilas, appt 4B\n69003 Lyon",
+  rentCents: 65_000,
+  chargesCents: 8_000,
+};
+
+const MARIE_ENTRY: TenantProfileEntry = { id: "marie-dupont", label: "Marie Dupont" };
+
+const TENANT_PROFILE_FIELDS: readonly ReceiptFormField[] = [
+  "tenantName",
+  "tenantAddress",
+  "tenantEmail",
+  "propertyAddress",
+  "rentAmount",
+  "chargesAmount",
+];
+
+function tenantProfileSelect(): HTMLSelectElement {
+  return byId<HTMLSelectElement>("tenant-profile");
+}
+
+function chooseTenantProfile(id: string): void {
+  const select = tenantProfileSelect();
+  select.value = id;
+  select.dispatchEvent(new Event("input", { bubbles: true }));
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+async function loadTenantProfile(
+  fake: FakeGateway,
+  choice: { readonly id: string; readonly profile: TenantProfilePayload },
+): Promise<void> {
+  chooseTenantProfile(choice.id);
+  await settle();
+  fake.tenantProfiles.loadCalls.at(-1)?.resolve(choice.profile);
+  await settle();
+}
+
+async function failLoadingTenantProfile(fake: FakeGateway, rejection: unknown): Promise<void> {
+  chooseTenantProfile("jeanne-martin");
+  await settle();
+  fake.tenantProfiles.loadCalls.at(-1)?.reject(rejection);
+  await settle();
+}
+
+function formValues(): ReceiptFormValues {
+  return Object.fromEntries(
+    (Object.keys(FIELD_IDS) as ReceiptFormField[]).map((field) => [field, fieldInput(field).value]),
+  ) as unknown as ReceiptFormValues;
+}
+
+// Saisie remplie avec le modèle compact, puis demande d'enregistrement de la fiche.
+async function saveFilledTenantProfile(): Promise<void> {
+  fillForm(FILLED_VALUES);
+  chooseTemplate("compact");
+  await clickButton("save-tenant-profile-button");
+}
+
+async function askReplacement(fake: FakeGateway): Promise<void> {
+  await saveFilledTenantProfile();
+  fake.tenantProfiles.createCalls[0]?.reject({ code: "tenantProfileExists", message: "existe" });
+  await settle();
+}
+
+function isInvalid(field: ReceiptFormField): boolean {
+  return fieldInput(field).getAttribute("aria-invalid") === "true";
+}
+
+describe("mountReceiptScreen: tenant profile list", () => {
+  it("lists the saved tenant profiles after an empty option selected by default", async () => {
+    // Arrange & Act
+    await mountScreen();
+
+    // Assert
+    const options = Array.from(tenantProfileSelect().options);
+    expect(options[0]?.value).toBe("");
+    expect(tenantProfileSelect().value).toBe("");
+    expect(
+      options.slice(1).map((option) => ({ id: option.value, label: option.textContent })),
+    ).toEqual(TENANT_PROFILES);
+  });
+
+  it("offers only the empty option when no tenant profile is saved", async () => {
+    // Arrange
+    const fake = createFakeGateway(Promise.resolve(TEMPLATES));
+    fake.tenantProfiles.list.mockResolvedValue([]);
+
+    // Act
+    await mountFake(fake);
+
+    // Assert
+    expect(Array.from(tenantProfileSelect().options).map((option) => option.value)).toEqual([""]);
+  });
+
+  it("places the tenant profile list above the other fields", async () => {
+    // Arrange & Act
+    await mountScreen();
+
+    // Assert
+    const firstControl = byId("form-controls").querySelector("input, textarea, select");
+    expect(firstControl).toBe(tenantProfileSelect());
+  });
+
+  it("reports a listing failure and offers only the empty option", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = createFakeGateway(Promise.resolve(TEMPLATES));
+    const rejection = { code: "tenantProfile", message: "dossier fiches illisible" };
+    fake.tenantProfiles.list.mockRejectedValue(rejection);
+
+    // Act
+    await mountFake(fake);
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(true);
+    expect(byId("tenant-profile-failure").getAttribute("role")).toBe("alert");
+    expect(plainText("tenant-profile-failure")).toContain(
+      COMMAND_ERROR_MESSAGES.tenantProfile.title,
+    );
+    expect(Array.from(tenantProfileSelect().options).map((option) => option.value)).toEqual([""]);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
+  });
+
+  it("shows no tenant profile message on a successful mount", async () => {
+    // Arrange & Act
+    await mountScreen();
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(false);
+    expect(isShown("tenant-profile-replace")).toBe(false);
+    expect(isShown("tenant-profile-saved")).toBe(false);
+  });
+
+  it("disables the tenant profile controls until the templates are listed", async () => {
+    // Arrange
+    const fake = createFakeGateway(new Promise<readonly TemplateInfo[]>(() => undefined));
+
+    // Act
+    void mountFake(fake);
+    await settle();
+
+    // Assert
+    expect(tenantProfileSelect().disabled).toBe(true);
+    expect(byId<HTMLButtonElement>("save-tenant-profile-button").disabled).toBe(true);
+  });
+
+  it("locks the tenant profile controls while a receipt is being sent", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await previewFilledReceipt(fake);
+
+    // Act
+    await clickButton("send-button");
+
+    // Assert
+    expect(isLocked(tenantProfileSelect())).toBe(true);
+    expect(isLocked(byId("save-tenant-profile-button"))).toBe(true);
+  });
+});
+
+describe("mountReceiptScreen: tenant profile loading", () => {
+  it("loads the chosen tenant profile", async () => {
+    // Arrange
+    const fake = await mountScreen();
+
+    // Act
+    chooseTenantProfile("jeanne-martin");
+    await settle();
+
+    // Assert
+    expect(fake.tenantProfiles.loadCalls.map((call) => call.argument)).toEqual(["jeanne-martin"]);
+  });
+
+  it("fills the tenant, the property, the amounts and the template from the profile", async () => {
+    // Arrange
+    const fake = await mountScreen();
+
+    // Act
+    await loadTenantProfile(fake, { id: "jeanne-martin", profile: JEANNE_PROFILE });
+
+    // Assert
+    expect(formValues()).toEqual({
+      tenantName: "Jeanne Martin",
+      tenantAddress: "8 rue Victor Hugo\n75011 Paris",
+      tenantEmail: "jeanne.martin@example.fr",
+      propertyAddress: "12 rue des Lilas\n75011 Paris",
+      periodStart: "",
+      periodEnd: "",
+      rentAmount: "650,00",
+      chargesAmount: "50,50",
+      paymentDate: "",
+    });
+    expect(byId<HTMLSelectElement>("template").value).toBe("compact");
+    expect(plainText("total")).toBe("700,50 €");
+    expect(tenantProfileSelect().value).toBe("jeanne-martin");
+  });
+
+  it("keeps the period and the payment date already typed", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    fillForm(FILLED_VALUES);
+
+    // Act
+    await loadTenantProfile(fake, { id: "jeanne-martin", profile: JEANNE_PROFILE });
+
+    // Assert
+    expect(formValues()).toMatchObject({
+      periodStart: FILLED_VALUES.periodStart,
+      periodEnd: FILLED_VALUES.periodEnd,
+      paymentDate: FILLED_VALUES.paymentDate,
+    });
+  });
+
+  it("previews the loaded tenant profile once the period and payment date are typed", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await loadTenantProfile(fake, { id: "jeanne-martin", profile: JEANNE_PROFILE });
+    typeInto("periodStart", "01/09/2026");
+    typeInto("periodEnd", "30/09/2026");
+    typeInto("paymentDate", "03/09/2026");
+
+    // Act
+    await clickButton("preview-button");
+
+    // Assert
+    expect(fake.previewCalls.map((call) => call.request)).toEqual([
+      {
+        templateId: "compact",
+        input: {
+          tenantName: "Jeanne Martin",
+          tenantAddress: "8 rue Victor Hugo\n75011 Paris",
+          tenantEmail: "jeanne.martin@example.fr",
+          propertyAddress: "12 rue des Lilas\n75011 Paris",
+          periodStart: "2026-09-01",
+          periodEnd: "2026-09-30",
+          rentCents: 65_000,
+          chargesCents: 5_050,
+          paymentDate: "2026-09-03",
+        },
+      },
+    ]);
+  });
+
+  it("invalidates the displayed preview", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await previewFilledReceipt(fake);
+
+    // Act
+    await loadTenantProfile(fake, { id: "jeanne-martin", profile: JEANNE_PROFILE });
+
+    // Assert
+    expect(statusText()).toBe("À régénérer");
+    expect(byId<HTMLButtonElement>("send-button").disabled).toBe(true);
+  });
+
+  it("leaves the form untouched when the empty option is chosen", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await loadTenantProfile(fake, { id: "jeanne-martin", profile: JEANNE_PROFILE });
+
+    // Act
+    chooseTenantProfile("");
+    await settle();
+
+    // Assert
+    expect(fake.tenantProfiles.loadCalls).toHaveLength(1);
+    expect(fieldInput("tenantName").value).toBe("Jeanne Martin");
+  });
+
+  it("ignores a tenant profile that arrives after another one was chosen", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    chooseTenantProfile("jeanne-martin");
+    await settle();
+    chooseTenantProfile("leo-durand");
+    await settle();
+
+    // Act
+    fake.tenantProfiles.loadCalls[1]?.resolve(LEO_PROFILE);
+    await settle();
+    fake.tenantProfiles.loadCalls[0]?.resolve(JEANNE_PROFILE);
+    await settle();
+
+    // Assert
+    expect(fieldInput("tenantName").value).toBe("Léo Durand");
+    expect(tenantProfileSelect().value).toBe("leo-durand");
+  });
+
+  it("reports a loading failure and logs it with an error code", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    const rejection = { code: "tenantProfile", message: "clé inconnue landlord_name" };
+
+    // Act
+    await failLoadingTenantProfile(fake, rejection);
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(true);
+    expect(plainText("tenant-profile-failure")).toContain(
+      COMMAND_ERROR_MESSAGES.tenantProfile.title,
+    );
+    expect(plainText("tenant-profile-failure")).toContain(
+      COMMAND_ERROR_MESSAGES.tenantProfile.text,
+    );
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
+  });
+
+  it("resets the fields, the template and the tenant profile list on a loading failure", async () => {
+    // Arrange
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    fillForm(FILLED_VALUES);
+    chooseTemplate("compact");
+
+    // Act
+    await failLoadingTenantProfile(fake, { code: "tenantProfile" });
+
+    // Assert
+    expect(Object.values(formValues())).toEqual(Object.keys(FIELD_IDS).map(() => ""));
+    expect(byId<HTMLSelectElement>("template").value).toBe("standard");
+    expect(tenantProfileSelect().value).toBe("");
+    expect(plainText("total")).toBe("—");
+  });
+
+  it("brings the screen back to its initial state on a loading failure", async () => {
+    // Arrange
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await previewFilledReceipt(fake);
+    fillForm(INVALID_VALUES);
+    await clickButton("preview-button");
+
+    // Act
+    await failLoadingTenantProfile(fake, { code: "tenantProfile" });
+
+    // Assert
+    expect((Object.keys(FIELD_IDS) as ReceiptFormField[]).filter(isInvalid)).toEqual([]);
+    expect(isShown("error-summary")).toBe(false);
+    expect(isShown("preview-empty")).toBe(true);
+    expect(statusText()).toBe("Non généré");
+  });
+
+  it("rejects a tenant profile whose template is not listed", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    fillForm(FILLED_VALUES);
+
+    // Act
+    await loadTenantProfile(fake, {
+      id: "jeanne-martin",
+      profile: { ...JEANNE_PROFILE, templateId: "retired" },
+    });
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(true);
+    expect(plainText("tenant-profile-failure")).toContain(
+      COMMAND_ERROR_MESSAGES.tenantProfile.title,
+    );
+    expect(Object.values(formValues())).toEqual(Object.keys(FIELD_IDS).map(() => ""));
+    expect(tenantProfileSelect().value).toBe("");
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE));
+  });
+
+  it("hides the loading failure once a tenant profile loads", async () => {
+    // Arrange
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await failLoadingTenantProfile(fake, { code: "tenantProfile" });
+
+    // Act
+    await loadTenantProfile(fake, { id: "leo-durand", profile: LEO_PROFILE });
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(false);
+  });
+});
+
+describe("mountReceiptScreen: tenant profile saving", () => {
+  it("creates a tenant profile from the form fields and the selected template", async () => {
+    // Arrange
+    const fake = await mountScreen();
+
+    // Act
+    await saveFilledTenantProfile();
+
+    // Assert
+    expect(fake.tenantProfiles.createCalls.map((call) => call.argument)).toEqual([MARIE_PROFILE]);
+    expect(fake.previewCalls).toEqual([]);
+  });
+
+  it("saves a tenant profile without a period or a payment date", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    fillForm({ ...FILLED_VALUES, periodStart: "", periodEnd: "", paymentDate: "" });
+    chooseTemplate("compact");
+
+    // Act
+    await clickButton("save-tenant-profile-button");
+
+    // Assert
+    expect(fake.tenantProfiles.createCalls.map((call) => call.argument)).toEqual([MARIE_PROFILE]);
+  });
+
+  it("saves the fields as edited after loading a tenant profile", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await loadTenantProfile(fake, { id: "jeanne-martin", profile: JEANNE_PROFILE });
+    typeInto("tenantEmail", "jeanne@example.fr");
+
+    // Act
+    await clickButton("save-tenant-profile-button");
+
+    // Assert
+    expect(fake.tenantProfiles.createCalls.map((call) => call.argument)).toEqual([
+      { ...JEANNE_PROFILE, tenantEmail: "jeanne@example.fr" },
+    ]);
+  });
+
+  it("marks only the invalid tenant profile fields and does not save", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    fillForm(INVALID_VALUES);
+
+    // Act
+    await clickButton("save-tenant-profile-button");
+
+    // Assert
+    expect(fake.tenantProfiles.createCalls).toEqual([]);
+    (Object.keys(FIELD_IDS) as ReceiptFormField[]).forEach((field) => {
+      const expectedError = TENANT_PROFILE_FIELDS.includes(field)
+        ? INVALID_VALUES_ERRORS[field]
+        : undefined;
+      if (expectedError === undefined) {
+        expect(isInvalid(field), field).toBe(false);
+      } else {
+        expect(isInvalid(field), field).toBe(true);
+        expect(fieldErrorText(field), field).toContain(FIELD_ERROR_MESSAGES[expectedError]);
+      }
+    });
+    expect(isShown("error-summary")).toBe(true);
+    expect(plainText("error-summary")).toContain("5");
+  });
+
+  it("focuses the first invalid tenant profile field", async () => {
+    // Arrange
+    await mountScreen();
+    fillForm({ ...FILLED_VALUES, tenantEmail: "marie", periodStart: "" });
+
+    // Act
+    await clickButton("save-tenant-profile-button");
+
+    // Assert
+    expect(document.activeElement).toBe(fieldInput("tenantEmail"));
+  });
+
+  it("updates the tenant profile errors as the user corrects a field", async () => {
+    // Arrange
+    await mountScreen();
+    fillForm(INVALID_VALUES);
+    await clickButton("save-tenant-profile-button");
+
+    // Act
+    typeInto("tenantName", "Marie Dupont");
+
+    // Assert
+    expect(isInvalid("tenantName")).toBe(false);
+    expect(isInvalid("periodEnd")).toBe(false);
+    expect(plainText("error-summary")).toContain("4");
+  });
+
+  it("refreshes the tenant profile list and selects the saved profile", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+    fake.tenantProfiles.list.mockResolvedValue([...TENANT_PROFILES, MARIE_ENTRY]);
+
+    // Act
+    fake.tenantProfiles.createCalls[0]?.resolve(MARIE_ENTRY);
+    await settle();
+
+    // Assert
+    expect(fake.tenantProfiles.list).toHaveBeenCalledTimes(2);
+    expect(Array.from(tenantProfileSelect().options).map((option) => option.value)).toEqual([
+      "",
+      "jeanne-martin",
+      "leo-durand",
+      "marie-dupont",
+    ]);
+    expect(tenantProfileSelect().value).toBe("marie-dupont");
+    expect(isShown("tenant-profile-saved")).toBe(true);
+    expect(plainText("tenant-profile-saved")).toContain("Marie Dupont");
+  });
+
+  it("disables saving while a tenant profile is being saved", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+
+    // Act
+    await clickButton("save-tenant-profile-button");
+
+    // Assert
+    expect(byId<HTMLButtonElement>("save-tenant-profile-button").disabled).toBe(true);
+    expect(fake.tenantProfiles.createCalls).toHaveLength(1);
+  });
+
+  it("reports a saving failure, logs it and allows saving again", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+    const rejection = { code: "tenantProfile", message: "permission refusée" };
+
+    // Act
+    fake.tenantProfiles.createCalls[0]?.reject(rejection);
+    await settle();
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(true);
+    expect(plainText("tenant-profile-failure")).toContain(
+      COMMAND_ERROR_MESSAGES.tenantProfile.title,
+    );
+    expect(isShown("tenant-profile-saved")).toBe(false);
+    expect(byId<HTMLButtonElement>("save-tenant-profile-button").disabled).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
+  });
+
+  it("hides the tenant profile messages once the form is edited", async () => {
+    // Arrange
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+    fake.tenantProfiles.createCalls[0]?.reject({ code: "tenantProfile" });
+    await settle();
+
+    // Act
+    typeInto("tenantName", "Marie Durand");
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(false);
+  });
+});
+
+describe("mountReceiptScreen: tenant profile replacement", () => {
+  it("asks in the page before replacing an existing tenant profile", async () => {
+    // Arrange
+    const fake = await mountScreen();
+
+    // Act
+    await askReplacement(fake);
+
+    // Assert
+    expect(isShown("tenant-profile-replace")).toBe(true);
+    expect(plainText("tenant-profile-replace")).toContain("Marie Dupont");
+    expect(isShown("replace-tenant-profile-button")).toBe(true);
+    expect(isShown("cancel-replace-tenant-profile-button")).toBe(true);
+    expect(isShown("tenant-profile-failure")).toBe(false);
+    expect(fake.tenantProfiles.replaceCalls).toEqual([]);
+  });
+
+  it("replaces the tenant profile once the user confirms", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await askReplacement(fake);
+
+    // Act
+    await clickButton("replace-tenant-profile-button");
+
+    // Assert
+    expect(fake.tenantProfiles.replaceCalls.map((call) => call.argument)).toEqual([MARIE_PROFILE]);
+    expect(isShown("tenant-profile-replace")).toBe(false);
+  });
+
+  it("refreshes the list and selects the replaced tenant profile", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await askReplacement(fake);
+    await clickButton("replace-tenant-profile-button");
+    fake.tenantProfiles.list.mockResolvedValue([...TENANT_PROFILES, MARIE_ENTRY]);
+
+    // Act
+    fake.tenantProfiles.replaceCalls[0]?.resolve(MARIE_ENTRY);
+    await settle();
+
+    // Assert
+    expect(tenantProfileSelect().value).toBe("marie-dupont");
+    expect(isShown("tenant-profile-saved")).toBe(true);
+  });
+
+  it("keeps the existing tenant profile when the user cancels", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await askReplacement(fake);
+
+    // Act
+    await clickButton("cancel-replace-tenant-profile-button");
+
+    // Assert
+    expect(isShown("tenant-profile-replace")).toBe(false);
+    expect(fake.tenantProfiles.replaceCalls).toEqual([]);
+    expect(fake.tenantProfiles.createCalls).toHaveLength(1);
+    expect(byId<HTMLButtonElement>("save-tenant-profile-button").disabled).toBe(false);
+  });
+
+  it("drops the replacement question when the form is edited", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await askReplacement(fake);
+
+    // Act
+    typeInto("rentAmount", "700");
+
+    // Assert
+    expect(isShown("tenant-profile-replace")).toBe(false);
+    expect(fake.tenantProfiles.replaceCalls).toEqual([]);
+  });
+
+  it("reports a replacement failure and logs it with an error code", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await askReplacement(fake);
+    await clickButton("replace-tenant-profile-button");
+    const rejection = { code: "tenantProfile", message: "disque plein" };
+
+    // Act
+    fake.tenantProfiles.replaceCalls[0]?.reject(rejection);
+    await settle();
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(true);
+    expect(plainText("tenant-profile-failure")).toContain(
+      COMMAND_ERROR_MESSAGES.tenantProfile.title,
+    );
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
   });
 });

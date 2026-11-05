@@ -28,6 +28,14 @@ export const COMMAND_ERROR_MESSAGES: Readonly<
     title: "Le mail n'a pas pu partir",
     text: "Le serveur d'envoi n'a pas répondu ou a refusé le message. Vérifiez votre connexion internet, puis réessayez. Rien n'a été envoyé.",
   },
+  tenantProfile: {
+    title: "",
+    text: "",
+  },
+  tenantProfileExists: {
+    title: "",
+    text: "",
+  },
   unknown: {
     title: "Une erreur inattendue s'est produite",
     text: "L'opération n'a pas abouti et rien n'a été envoyé. Réessayez ; si le problème persiste, redémarrez l'application.",
