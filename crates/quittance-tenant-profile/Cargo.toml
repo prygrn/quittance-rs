@@ -1,0 +1,17 @@
+[package]
+name = "quittance-tenant-profile"
+version = "0.1.0"
+description = "Fiches locataire : préremplissage des quittances, enregistrées en TOML"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+quittance-core = { path = "../quittance-core" }
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+toml = "1.2.0"
