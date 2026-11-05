@@ -75,7 +75,7 @@ L'application lit le fichier `.env` placé **dans le même dossier que son exéc
 Une fiche locataire évite de ressaisir chaque mois le même locataire. Elle enregistre tout ce qui préremplit une quittance : template, nom, adresse et email du locataire, adresse du logement, loyer et charges. La période et la date de paiement restent à saisir ; le bailleur reste dans `.env`.
 
 - **Dossier** : `fiches/`, **dans le même dossier que l'exécutable**, comme le `.env` (en développement : `target/debug/fiches/`). Il est créé au premier enregistrement ; tant qu'il n'existe pas, la liste est vide.
-- **Nommage** : un fichier `<id>.toml` par fiche. L'id dérive du nom du locataire : minuscules, accents français retirés (`é` → `e`, `ç` → `c`, `œ` → `oe`…), toute autre suite de caractères remplacée par `-`, sans `-` en tête ni en fin. « Hélène Dupont-Durand » devient `helene-dupont-durand.toml`.
+- **Nommage** : un fichier `<id>.toml` par fiche. L'id dérive du nom du locataire : minuscules, accents français retirés (`é` → `e`, `ç` → `c`, `œ` → `oe`…), toute autre suite de caractères remplacée par `-`, sans `-` en tête ni en fin. « Hélène Dupont-Durand » devient `helene-dupont-durand.toml`. Au chargement, le nom du locataire doit encore donner le nom du fichier : `jeanne.toml` contenant « Jeanne Martin » est refusé. Pour changer le nom d'un locataire, enregistrer une nouvelle fiche depuis l'application.
 - **Collisions** : deux locataires dont les noms donnent le même id (« Jeanne Martin », « JEANNE MARTIN ») partagent la même fiche. L'application le signale à l'enregistrement et propose de remplacer la fiche existante.
 - **Format** : clés ci-dessous, toutes obligatoires, toute autre clé refusée. Les montants sont en euros à la française : écrits `"650,00"`, lus aussi sous la forme `"650"` ou `"50,5"`.
 
@@ -90,6 +90,7 @@ charges = "50,50"
 ```
 
 - **Validation** : une fiche est vérifiée à l'enregistrement et au chargement, comme une quittance (email, adresses, montants) ; son `template_id` doit désigner un template existant. Une fiche illisible ou invalide reste listée sous son id et son chargement échoue avec un message d'erreur.
+- **Liste** : les fiches sont triées par nom du locataire sans tenir compte de la casse ni des accents (« Élodie » avant « Zoé »).
 - **Suppression** : l'interface n'en propose pas ; supprimer le fichier à la main.
 - **Confidentialité** : les fiches contiennent des données personnelles ; `fiches/` est ignoré par git et ne doit jamais être commité.
 
