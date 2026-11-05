@@ -432,33 +432,53 @@ mod tests {
     fn given_tenant_profile_storage_errors_when_converting_then_code_is_tenant_profile() {
         let id = || "jeanne-martin".to_owned();
         let errors = [
-            TenantProfileStorageError::InvalidId("../.env".to_owned()),
-            TenantProfileStorageError::NotFound { id: id() },
-            TenantProfileStorageError::Unlistable(io::Error::from(io::ErrorKind::PermissionDenied)),
-            TenantProfileStorageError::Unreadable {
-                id: id(),
-                source: io::Error::from(io::ErrorKind::InvalidData),
-            },
-            TenantProfileStorageError::Invalid {
-                id: id(),
-                source: TenantProfileError::MissingPropertyAddress,
-            },
-            TenantProfileStorageError::Unwritable {
-                id: id(),
-                source: io::Error::from(io::ErrorKind::PermissionDenied),
-            },
+            (
+                Some("../.env"),
+                TenantProfileStorageError::InvalidId("../.env".to_owned()),
+            ),
+            (
+                Some("jeanne-martin"),
+                TenantProfileStorageError::NotFound { id: id() },
+            ),
+            (
+                None,
+                TenantProfileStorageError::Unlistable(io::Error::from(
+                    io::ErrorKind::PermissionDenied,
+                )),
+            ),
+            (
+                Some("jeanne-martin"),
+                TenantProfileStorageError::Unreadable {
+                    id: id(),
+                    source: io::Error::from(io::ErrorKind::InvalidData),
+                },
+            ),
+            (
+                Some("jeanne-martin"),
+                TenantProfileStorageError::Invalid {
+                    id: id(),
+                    source: TenantProfileError::MissingPropertyAddress,
+                },
+            ),
+            (
+                Some("jeanne-martin"),
+                TenantProfileStorageError::Unwritable {
+                    id: id(),
+                    source: io::Error::from(io::ErrorKind::PermissionDenied),
+                },
+            ),
         ];
 
-        for error in errors {
+        for (expected_id, error) in errors {
             let command_error = CommandError::from(error);
 
             assert_eq!(command_error.code(), CommandErrorCode::TenantProfile);
-            assert!(
-                command_error.message().contains("jeanne-martin")
-                    || command_error.message().contains("../.env")
-                    || command_error.message().contains("listed"),
-                "{command_error}"
-            );
+            if let Some(expected_id) = expected_id {
+                assert!(
+                    command_error.message().contains(expected_id),
+                    "{command_error} should name {expected_id}"
+                );
+            }
         }
     }
 
