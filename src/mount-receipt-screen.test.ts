@@ -15,6 +15,7 @@ import { mountReceiptScreen } from "./mount-receipt-screen";
 import type { FieldErrorCode, ReceiptFormField, ReceiptFormValues } from "./receipt-form";
 import type { ReceiptGateway } from "./receipt-gateway";
 import type { PreviewRequest } from "./screen-state";
+import { TENANT_PROFILE_FAILURE_MESSAGES } from "./tenant-profile-failure-messages";
 import type { TenantProfileGateway } from "./tenant-profile-gateway";
 
 // Identifiants stables du balisage, partagés avec les futurs tests e2e.
@@ -1504,6 +1505,86 @@ describe("mountReceiptScreen: tenant profile saving", () => {
     expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
   });
 
+  it("explains a tenant profile rejected by the backend in terms of the profile", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+    const rejection = { code: "validation", message: "adresse du logement vide" };
+
+    // Act
+    fake.tenantProfiles.createCalls[0]?.reject(rejection);
+    await settle();
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(true);
+    expect(plainText("tenant-profile-failure")).toContain(
+      TENANT_PROFILE_FAILURE_MESSAGES.saveRejected.title,
+    );
+    expect(plainText("tenant-profile-failure")).toContain(
+      TENANT_PROFILE_FAILURE_MESSAGES.saveRejected.text,
+    );
+    expect(plainText("tenant-profile-failure")).not.toContain(
+      COMMAND_ERROR_MESSAGES.validation.title,
+    );
+    expect(isShown("tenant-profile-saved")).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
+  });
+
+  it("tells that the tenant profile is saved when the list cannot be reloaded", async () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+    const rejection = { code: "tenantProfile", message: "dossier fiches illisible" };
+    fake.tenantProfiles.list.mockRejectedValue(rejection);
+
+    // Act
+    fake.tenantProfiles.createCalls[0]?.resolve(MARIE_ENTRY);
+    await settle();
+
+    // Assert
+    expect(isShown("tenant-profile-failure")).toBe(true);
+    expect(plainText("tenant-profile-failure")).toContain(
+      TENANT_PROFILE_FAILURE_MESSAGES.listNotRefreshed.title,
+    );
+    expect(plainText("tenant-profile-failure")).toContain(
+      TENANT_PROFILE_FAILURE_MESSAGES.listNotRefreshed.text,
+    );
+    expect(plainText("tenant-profile-failure")).not.toContain(
+      COMMAND_ERROR_MESSAGES.tenantProfile.title,
+    );
+    expect(byId<HTMLButtonElement>("save-tenant-profile-button").disabled).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(LOGGED_ERROR_CODE), rejection);
+  });
+
+  it("gives the focus back to the save button once the tenant profile is saved", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+
+    // Act
+    fake.tenantProfiles.createCalls[0]?.resolve(MARIE_ENTRY);
+    await settle();
+
+    // Assert
+    expect(document.activeElement).toBe(byId("save-tenant-profile-button"));
+  });
+
+  it("gives the focus back to the save button once saving fails", async () => {
+    // Arrange
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+
+    // Act
+    fake.tenantProfiles.createCalls[0]?.reject({ code: "tenantProfile" });
+    await settle();
+
+    // Assert
+    expect(document.activeElement).toBe(byId("save-tenant-profile-button"));
+  });
+
   it("hides the tenant profile messages once the form is edited", async () => {
     // Arrange
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -1535,6 +1616,43 @@ describe("mountReceiptScreen: tenant profile replacement", () => {
     expect(isShown("cancel-replace-tenant-profile-button")).toBe(true);
     expect(isShown("tenant-profile-failure")).toBe(false);
     expect(fake.tenantProfiles.replaceCalls).toEqual([]);
+  });
+
+  it("focuses the replace button when the replacement question shows", async () => {
+    // Arrange
+    const fake = await mountScreen();
+
+    // Act
+    await askReplacement(fake);
+
+    // Assert
+    expect(document.activeElement).toBe(byId("replace-tenant-profile-button"));
+  });
+
+  it("gives the focus back to the save button when the user cancels", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await askReplacement(fake);
+
+    // Act
+    await clickButton("cancel-replace-tenant-profile-button");
+
+    // Assert
+    expect(document.activeElement).toBe(byId("save-tenant-profile-button"));
+  });
+
+  it("gives the focus back to the save button once the replacement is saved", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await askReplacement(fake);
+    await clickButton("replace-tenant-profile-button");
+
+    // Act
+    fake.tenantProfiles.replaceCalls[0]?.resolve(MARIE_ENTRY);
+    await settle();
+
+    // Assert
+    expect(document.activeElement).toBe(byId("save-tenant-profile-button"));
   });
 
   it("replaces the tenant profile once the user confirms", async () => {
