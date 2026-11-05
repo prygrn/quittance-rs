@@ -11,20 +11,67 @@ impl TenantProfileId {
     /// Id dérivé du nom du locataire : minuscules, accents français retirés, toute suite
     /// d'autres caractères remplacée par un tiret, sans tiret en tête ni en fin.
     pub fn from_tenant_name(tenant_name: &str) -> Result<Self, TenantProfileError> {
-        let _ = tenant_name;
-        todo!()
+        let spelled: String = tenant_name
+            .to_lowercase()
+            .chars()
+            .map(without_french_accent)
+            .collect();
+        let id = spelled
+            .split(|character: char| !character.is_ascii_alphanumeric())
+            .filter(|word| !word.is_empty())
+            .collect::<Vec<_>>()
+            .join(ID_WORD_SEPARATOR);
+        if id.is_empty() {
+            return Err(TenantProfileError::EmptyId {
+                tenant_name: tenant_name.to_owned(),
+            });
+        }
+        Ok(Self(id))
     }
 
     /// Id reçu de l'extérieur (UI, nom de fichier). Seule la forme produite par
     /// [`Self::from_tenant_name`] est acceptée : un id ne désigne jamais un autre chemin.
     pub fn parse(id: &str) -> Result<Self, TenantProfileStorageError> {
-        let _ = id;
-        todo!()
+        match Self::from_tenant_name(id) {
+            Ok(derived) if derived.as_str() == id => Ok(derived),
+            _ => Err(TenantProfileStorageError::InvalidId(id.to_owned())),
+        }
     }
 
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+const ID_WORD_SEPARATOR: &str = "-";
+
+/// Lettres minuscules accentuées et ligatures du français, avec leur graphie ASCII.
+const FRENCH_LETTERS: [(char, &str); 18] = [
+    ('à', "a"),
+    ('â', "a"),
+    ('ä', "a"),
+    ('æ', "ae"),
+    ('ç', "c"),
+    ('é', "e"),
+    ('è', "e"),
+    ('ê', "e"),
+    ('ë', "e"),
+    ('î', "i"),
+    ('ï', "i"),
+    ('ô', "o"),
+    ('ö', "o"),
+    ('œ', "oe"),
+    ('ù', "u"),
+    ('û', "u"),
+    ('ü', "u"),
+    ('ÿ', "y"),
+];
+
+fn without_french_accent(character: char) -> String {
+    FRENCH_LETTERS
+        .iter()
+        .find(|(letter, _)| *letter == character)
+        .map_or_else(|| character.to_string(), |(_, ascii)| (*ascii).to_owned())
 }
 
 impl fmt::Display for TenantProfileId {

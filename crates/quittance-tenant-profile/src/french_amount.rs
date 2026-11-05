@@ -2,16 +2,53 @@
 
 use crate::TenantProfileError;
 
+mod amount_syntax {
+    pub const CENTS_PER_EURO: u64 = 100;
+    pub const DECIMAL_SEPARATOR: char = ',';
+    pub const MAXIMUM_DECIMAL_DIGITS: usize = 2;
+}
+
 /// Montant écrit en euros, avec une virgule et toujours deux décimales : `650,00`.
 pub(crate) fn formatted_amount(cents: u64) -> String {
-    let _ = cents;
-    todo!()
+    format!(
+        "{}{}{:02}",
+        cents / amount_syntax::CENTS_PER_EURO,
+        amount_syntax::DECIMAL_SEPARATOR,
+        cents % amount_syntax::CENTS_PER_EURO
+    )
 }
 
 /// Montant en centimes d'un texte au format `\d+(,\d{1,2})?` : `650`, `650,5`, `650,50`.
 pub(crate) fn parsed_amount(field: &'static str, value: &str) -> Result<u64, TenantProfileError> {
-    let _ = (field, value);
-    todo!()
+    cents_of(value).ok_or_else(|| TenantProfileError::InvalidAmount {
+        field,
+        value: value.to_owned(),
+    })
+}
+
+fn cents_of(value: &str) -> Option<u64> {
+    let (euros, decimals) = value
+        .split_once(amount_syntax::DECIMAL_SEPARATOR)
+        .unwrap_or((value, "0"));
+    if !is_digit_run(euros)
+        || !is_digit_run(decimals)
+        || decimals.len() > amount_syntax::MAXIMUM_DECIMAL_DIGITS
+    {
+        return None;
+    }
+    let decimal_cents = match decimals.len() {
+        1 => decimals.parse::<u64>().ok()? * 10,
+        _ => decimals.parse::<u64>().ok()?,
+    };
+    euros
+        .parse::<u64>()
+        .ok()?
+        .checked_mul(amount_syntax::CENTS_PER_EURO)?
+        .checked_add(decimal_cents)
+}
+
+fn is_digit_run(text: &str) -> bool {
+    !text.is_empty() && text.chars().all(|character| character.is_ascii_digit())
 }
 
 #[cfg(test)]

@@ -33,8 +33,36 @@ impl TenantProfile {
         fields: TenantProfileFields,
         known_template_ids: &[&str],
     ) -> Result<Self, TenantProfileError> {
-        let _ = (fields, known_template_ids);
-        todo!()
+        if !known_template_ids.contains(&fields.template_id.as_str()) {
+            return Err(TenantProfileError::UnknownTemplate(fields.template_id));
+        }
+        let tenant = Party::new(
+            &fields.tenant_name,
+            &fields.tenant_address,
+            &fields.tenant_email,
+        )?;
+        let property_address = fields.property_address.trim();
+        if property_address.is_empty() {
+            return Err(TenantProfileError::MissingPropertyAddress);
+        }
+        if fields
+            .rent_cents
+            .checked_add(fields.charges_cents)
+            .is_none()
+        {
+            return Err(TenantProfileError::TotalOverflow {
+                rent_cents: fields.rent_cents,
+                charges_cents: fields.charges_cents,
+            });
+        }
+        Ok(Self {
+            id: TenantProfileId::from_tenant_name(tenant.name())?,
+            template_id: fields.template_id,
+            tenant,
+            property_address: property_address.to_owned(),
+            rent: Money::from_cents(fields.rent_cents),
+            charges: Money::from_cents(fields.charges_cents),
+        })
     }
 
     pub fn id(&self) -> &TenantProfileId {

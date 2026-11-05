@@ -1,10 +1,13 @@
-use std::io;
-use std::path::PathBuf;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 use crate::{TenantProfileId, TenantProfileStorage};
 
 /// Fiches enregistrées dans un dossier, un fichier `<id>.toml` par fiche. Le dossier est
 /// créé au premier enregistrement.
+const FILE_EXTENSION: &str = "toml";
+
 pub struct DirectoryTenantProfileStorage {
     directory: PathBuf,
 }
@@ -15,27 +18,61 @@ impl DirectoryTenantProfileStorage {
             directory: directory.into(),
         }
     }
+
+    fn file_path(&self, id: &TenantProfileId) -> PathBuf {
+        self.directory.join(format!("{id}.{FILE_EXTENSION}"))
+    }
+
+    fn created_directory(&self) -> io::Result<()> {
+        fs::create_dir_all(&self.directory).map_err(|error| located(&self.directory, error))
+    }
+}
+
+/// Erreur d'entrée-sortie qui nomme le chemin en cause, en gardant son type.
+fn located(path: &Path, error: io::Error) -> io::Error {
+    io::Error::new(error.kind(), format!("`{}`: {error}", path.display()))
 }
 
 impl TenantProfileStorage for DirectoryTenantProfileStorage {
     fn stored_names(&self) -> io::Result<Vec<String>> {
-        let _ = &self.directory;
-        todo!()
+        let entries = match fs::read_dir(&self.directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(located(&self.directory, error)),
+        };
+        let mut names = Vec::new();
+        for entry in entries {
+            let path = entry
+                .map_err(|error| located(&self.directory, error))?
+                .path();
+            let is_profile_file = path.is_file()
+                && path
+                    .extension()
+                    .is_some_and(|extension| extension == FILE_EXTENSION);
+            if let (true, Some(stem)) = (is_profile_file, path.file_stem()) {
+                names.push(stem.to_string_lossy().into_owned());
+            }
+        }
+        Ok(names)
     }
 
     fn read(&self, id: &TenantProfileId) -> io::Result<String> {
-        let _ = id;
-        todo!()
+        let path = self.file_path(id);
+        fs::read_to_string(&path).map_err(|error| located(&path, error))
     }
 
     fn write_new(&self, id: &TenantProfileId, contents: &str) -> io::Result<()> {
-        let _ = (id, contents);
-        todo!()
+        self.created_directory()?;
+        let path = self.file_path(id);
+        File::create_new(&path)
+            .and_then(|mut file| file.write_all(contents.as_bytes()))
+            .map_err(|error| located(&path, error))
     }
 
     fn overwrite(&self, id: &TenantProfileId, contents: &str) -> io::Result<()> {
-        let _ = (id, contents);
-        todo!()
+        self.created_directory()?;
+        let path = self.file_path(id);
+        fs::write(&path, contents).map_err(|error| located(&path, error))
     }
 }
 

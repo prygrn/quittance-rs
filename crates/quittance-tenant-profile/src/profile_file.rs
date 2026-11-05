@@ -1,12 +1,34 @@
 //! Format TOML d'un fichier de fiche, montants en euros à la française.
 
+use serde::{Deserialize, Serialize};
+
 use crate::french_amount::{formatted_amount, parsed_amount};
-use crate::{TenantProfile, TenantProfileId, TenantProfileStorageError};
+use crate::{TenantProfile, TenantProfileFields, TenantProfileId, TenantProfileStorageError};
+
+/// Clés du fichier, dans leur ordre d'écriture.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TenantProfileFile {
+    template_id: String,
+    tenant_name: String,
+    tenant_address: String,
+    tenant_email: String,
+    property_address: String,
+    rent: String,
+    charges: String,
+}
 
 /// Contenu du fichier de la fiche.
 pub(crate) fn profile_toml(profile: &TenantProfile) -> Result<String, toml::ser::Error> {
-    let _ = (profile, formatted_amount);
-    todo!()
+    toml::to_string(&TenantProfileFile {
+        template_id: profile.template_id().to_owned(),
+        tenant_name: profile.tenant().name().to_owned(),
+        tenant_address: profile.tenant().address().to_owned(),
+        tenant_email: profile.tenant().email().to_owned(),
+        property_address: profile.property_address().to_owned(),
+        rent: formatted_amount(profile.rent().cents()),
+        charges: formatted_amount(profile.charges().cents()),
+    })
 }
 
 /// Fiche lue depuis le contenu de son fichier, validée comme à l'enregistrement.
@@ -15,8 +37,25 @@ pub(crate) fn profile_from_toml(
     contents: &str,
     known_template_ids: &[&str],
 ) -> Result<TenantProfile, TenantProfileStorageError> {
-    let _ = (id, contents, known_template_ids, parsed_amount);
-    todo!()
+    let file: TenantProfileFile =
+        toml::from_str(contents).map_err(|source| TenantProfileStorageError::Malformed {
+            id: id.to_string(),
+            source,
+        })?;
+    let invalid = |source| TenantProfileStorageError::Invalid {
+        id: id.to_string(),
+        source,
+    };
+    let fields = TenantProfileFields {
+        rent_cents: parsed_amount("rent", &file.rent).map_err(invalid)?,
+        charges_cents: parsed_amount("charges", &file.charges).map_err(invalid)?,
+        template_id: file.template_id,
+        tenant_name: file.tenant_name,
+        tenant_address: file.tenant_address,
+        tenant_email: file.tenant_email,
+        property_address: file.property_address,
+    };
+    TenantProfile::new(fields, known_template_ids).map_err(invalid)
 }
 
 #[cfg(test)]

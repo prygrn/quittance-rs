@@ -1,5 +1,7 @@
+use std::io;
+
 use crate::profile_file::{profile_from_toml, profile_toml};
-use crate::{TenantProfile, TenantProfileStorage, TenantProfileStorageError};
+use crate::{TenantProfile, TenantProfileId, TenantProfileStorage, TenantProfileStorageError};
 
 /// Fiche proposée à l'UI : `label` est le nom du locataire, ou l'id si la fiche ne peut
 /// pas être chargée.
@@ -20,12 +22,37 @@ impl TenantProfileRepository<'_> {
     /// Une entrée par fichier de fiche, triée par libellé. Une fiche illisible ou invalide
     /// n'empêche pas de lister les autres.
     pub fn list(&self) -> Result<Vec<TenantProfileEntry>, TenantProfileStorageError> {
-        todo!()
+        let names = self
+            .storage
+            .stored_names()
+            .map_err(TenantProfileStorageError::Unlistable)?;
+        let mut entries: Vec<TenantProfileEntry> = names
+            .into_iter()
+            .map(|name| TenantProfileEntry {
+                label: self.load(&name).map_or_else(
+                    |_| name.clone(),
+                    |profile| profile.tenant().name().to_owned(),
+                ),
+                id: name,
+            })
+            .collect();
+        entries.sort_by(|left, right| (&left.label, &left.id).cmp(&(&right.label, &right.id)));
+        Ok(entries)
     }
 
     pub fn load(&self, id: &str) -> Result<TenantProfile, TenantProfileStorageError> {
-        let _ = (id, profile_from_toml);
-        todo!()
+        let id = TenantProfileId::parse(id)?;
+        let contents = self.storage.read(&id).map_err(|source| {
+            if source.kind() == io::ErrorKind::NotFound {
+                TenantProfileStorageError::NotFound { id: id.to_string() }
+            } else {
+                TenantProfileStorageError::Unreadable {
+                    id: id.to_string(),
+                    source,
+                }
+            }
+        })?;
+        profile_from_toml(&id, &contents, self.known_template_ids)
     }
 
     /// Enregistre une nouvelle fiche ; refuse d'écraser une fiche de même id.
@@ -33,8 +60,19 @@ impl TenantProfileRepository<'_> {
         &self,
         profile: &TenantProfile,
     ) -> Result<TenantProfileEntry, TenantProfileStorageError> {
-        let _ = (profile, profile_toml);
-        todo!()
+        let contents = file_contents(profile)?;
+        self.storage
+            .write_new(profile.id(), &contents)
+            .map_err(|source| {
+                if source.kind() == io::ErrorKind::AlreadyExists {
+                    TenantProfileStorageError::AlreadyExists {
+                        id: profile.id().to_string(),
+                    }
+                } else {
+                    unwritable(profile, source)
+                }
+            })?;
+        Ok(entry_of(profile))
     }
 
     /// Enregistre la fiche, en écrasant celle de même id si elle existe.
@@ -42,8 +80,29 @@ impl TenantProfileRepository<'_> {
         &self,
         profile: &TenantProfile,
     ) -> Result<TenantProfileEntry, TenantProfileStorageError> {
-        let _ = profile;
-        todo!()
+        let contents = file_contents(profile)?;
+        self.storage
+            .overwrite(profile.id(), &contents)
+            .map_err(|source| unwritable(profile, source))?;
+        Ok(entry_of(profile))
+    }
+}
+
+fn file_contents(profile: &TenantProfile) -> Result<String, TenantProfileStorageError> {
+    profile_toml(profile).map_err(|error| unwritable(profile, io::Error::other(error)))
+}
+
+fn unwritable(profile: &TenantProfile, source: io::Error) -> TenantProfileStorageError {
+    TenantProfileStorageError::Unwritable {
+        id: profile.id().to_string(),
+        source,
+    }
+}
+
+fn entry_of(profile: &TenantProfile) -> TenantProfileEntry {
+    TenantProfileEntry {
+        id: profile.id().to_string(),
+        label: profile.tenant().name().to_owned(),
     }
 }
 
