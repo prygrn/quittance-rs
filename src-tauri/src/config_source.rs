@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::app_config::{ConfigError, EnvFileProblem};
+use crate::executable_directory::executable_directory;
 
 /// Nom du fichier de configuration, placé à côté de l'exécutable.
 const ENV_FILE_NAME: &str = ".env";
@@ -28,13 +28,7 @@ impl EnvFileConfigSource {
 
     /// Fichier `.env` du dossier de l'exécutable.
     pub fn next_to_executable() -> Result<Self, ConfigError> {
-        let executable = std::env::current_exe().map_err(ConfigError::UnknownExecutableLocation)?;
-        let directory = executable.parent().ok_or_else(|| {
-            ConfigError::UnknownExecutableLocation(io::Error::other(format!(
-                "executable path `{}` has no parent directory",
-                executable.display()
-            )))
-        })?;
+        let directory = executable_directory().map_err(ConfigError::UnknownExecutableLocation)?;
         Ok(Self::new(directory.join(ENV_FILE_NAME)))
     }
 

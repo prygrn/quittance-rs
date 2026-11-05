@@ -7,6 +7,7 @@ mod command_error;
 mod commands;
 mod config_source;
 mod delivery_factory;
+mod executable_directory;
 mod iso_date;
 mod receipt_input_payload;
 mod receipt_service;
