@@ -3,7 +3,10 @@
 use serde::{Deserialize, Serialize};
 
 use crate::french_amount::{formatted_amount, parsed_amount};
-use crate::{TenantProfile, TenantProfileFields, TenantProfileId, TenantProfileStorageError};
+use crate::{
+    TenantProfile, TenantProfileError, TenantProfileFields, TenantProfileId,
+    TenantProfileStorageError,
+};
 
 /// Clés du fichier, dans leur ordre d'écriture.
 #[derive(Serialize, Deserialize)]
@@ -31,7 +34,8 @@ pub(crate) fn profile_toml(profile: &TenantProfile) -> Result<String, toml::ser:
     })
 }
 
-/// Fiche lue depuis le contenu de son fichier, validée comme à l'enregistrement.
+/// Fiche lue depuis le contenu de son fichier, validée comme à l'enregistrement. Le nom du
+/// locataire doit donner l'id du fichier, sous lequel la fiche serait de nouveau enregistrée.
 pub(crate) fn profile_from_toml(
     id: &TenantProfileId,
     contents: &str,
@@ -55,7 +59,15 @@ pub(crate) fn profile_from_toml(
         tenant_email: file.tenant_email,
         property_address: file.property_address,
     };
-    TenantProfile::new(fields, known_template_ids).map_err(invalid)
+    let profile = TenantProfile::new(fields, known_template_ids).map_err(invalid)?;
+    if profile.id() != id {
+        return Err(invalid(TenantProfileError::MismatchedId {
+            file_id: id.to_string(),
+            derived_id: profile.id().to_string(),
+            tenant_name: profile.tenant().name().to_owned(),
+        }));
+    }
+    Ok(profile)
 }
 
 #[cfg(test)]
