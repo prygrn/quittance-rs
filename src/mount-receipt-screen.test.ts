@@ -1571,6 +1571,20 @@ describe("mountReceiptScreen: tenant profile saving", () => {
     expect(document.activeElement).toBe(byId("save-tenant-profile-button"));
   });
 
+  it("leaves the focus in the field the user moved to while saving", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await saveFilledTenantProfile();
+    fieldInput("periodStart").focus();
+
+    // Act
+    fake.tenantProfiles.createCalls[0]?.resolve(MARIE_ENTRY);
+    await settle();
+
+    // Assert
+    expect(document.activeElement).toBe(fieldInput("periodStart"));
+  });
+
   it("gives the focus back to the save button once saving fails", async () => {
     // Arrange
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -1639,6 +1653,21 @@ describe("mountReceiptScreen: tenant profile replacement", () => {
 
     // Assert
     expect(document.activeElement).toBe(byId("save-tenant-profile-button"));
+  });
+
+  it("leaves the focus in the field the user moved to while replacing", async () => {
+    // Arrange
+    const fake = await mountScreen();
+    await askReplacement(fake);
+    await clickButton("replace-tenant-profile-button");
+    fieldInput("paymentDate").focus();
+
+    // Act
+    fake.tenantProfiles.replaceCalls[0]?.resolve(MARIE_ENTRY);
+    await settle();
+
+    // Assert
+    expect(document.activeElement).toBe(fieldInput("paymentDate"));
   });
 
   it("gives the focus back to the save button once the replacement is saved", async () => {
