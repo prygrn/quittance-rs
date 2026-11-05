@@ -28,6 +28,27 @@ impl DirectoryTenantProfileStorage {
     }
 }
 
+/// Nom sans extension de chaque fichier `.toml` parmi les entrées d'un dossier.
+fn profile_file_names(
+    entries: impl Iterator<Item = io::Result<PathBuf>>,
+) -> io::Result<Vec<String>> {
+    let mut names = Vec::new();
+    for entry in entries {
+        let path = entry?;
+        let is_profile_file = path.is_file()
+            && path
+                .extension()
+                .is_some_and(|extension| extension == FILE_EXTENSION);
+        if !is_profile_file {
+            continue;
+        }
+        if let Some(stem) = path.file_stem() {
+            names.push(stem.to_string_lossy().into_owned());
+        }
+    }
+    Ok(names)
+}
+
 /// Erreur d'entrée-sortie qui nomme le chemin en cause, en gardant son type.
 fn located(path: &Path, error: io::Error) -> io::Error {
     io::Error::new(error.kind(), format!("`{}`: {error}", path.display()))
@@ -40,20 +61,8 @@ impl TenantProfileStorage for DirectoryTenantProfileStorage {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
             Err(error) => return Err(located(&self.directory, error)),
         };
-        let mut names = Vec::new();
-        for entry in entries {
-            let path = entry
-                .map_err(|error| located(&self.directory, error))?
-                .path();
-            let is_profile_file = path.is_file()
-                && path
-                    .extension()
-                    .is_some_and(|extension| extension == FILE_EXTENSION);
-            if let (true, Some(stem)) = (is_profile_file, path.file_stem()) {
-                names.push(stem.to_string_lossy().into_owned());
-            }
-        }
-        Ok(names)
+        profile_file_names(entries.map(|entry| entry.map(|entry| entry.path())))
+            .map_err(|error| located(&self.directory, error))
     }
 
     fn read(&self, id: &TenantProfileId) -> io::Result<String> {
