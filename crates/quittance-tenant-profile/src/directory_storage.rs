@@ -71,6 +71,18 @@ fn synced_new_file(path: &Path, contents: &str) -> io::Result<()> {
     file.sync_all()
 }
 
+/// Met le fichier temporaire à la place de la fiche par un lien physique, qui échoue si la
+/// fiche existe déjà, contrairement à un renommage.
+fn placed_without_overwrite(
+    temporary_path: &Path,
+    path: &Path,
+    contents: &str,
+    hard_link: impl FnOnce(&Path, &Path) -> io::Result<()>,
+) -> io::Result<()> {
+    let _ = contents;
+    hard_link(temporary_path, path)
+}
+
 /// Nom sans extension de chaque fichier `.toml` parmi les entrées d'un dossier. Une entrée
 /// illisible est ignorée : elle n'empêche pas de lister les autres fiches.
 fn profile_file_names(
@@ -113,10 +125,11 @@ impl TenantProfileStorage for DirectoryTenantProfileStorage {
         fs::read_to_string(&path).map_err(|error| located(&path, error))
     }
 
-    /// Un lien physique, contrairement à un renommage, échoue si la fiche existe déjà.
     fn write_new(&self, id: &TenantProfileId, contents: &str) -> io::Result<()> {
         self.write_through_temporary_file(id, contents, |temporary_path, path| {
-            fs::hard_link(temporary_path, path)
+            placed_without_overwrite(temporary_path, path, contents, |from, to| {
+                fs::hard_link(from, to)
+            })
         })
     }
 
@@ -254,6 +267,82 @@ mod tests {
 
         assert_eq!(result.unwrap_err().kind(), io::ErrorKind::AlreadyExists);
         assert!(!outside.exists());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    fn unsupported_hard_link(_: &Path, _: &Path) -> io::Result<()> {
+        Err(io::Error::from(io::ErrorKind::Unsupported))
+    }
+
+    #[test]
+    fn given_file_system_without_hard_links_when_placing_new_profile_then_it_is_created() {
+        let directory = unique_temp_path("place-without-hard-link");
+        fs::create_dir_all(&directory).unwrap();
+        let temporary_path = directory.join(".jeanne-martin.toml.tmp");
+        let path = directory.join("jeanne-martin.toml");
+        fs::write(&temporary_path, CONTENTS).unwrap();
+
+        placed_without_overwrite(&temporary_path, &path, CONTENTS, unsupported_hard_link).unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), CONTENTS);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn given_file_system_without_hard_links_when_placing_existing_profile_then_it_already_exists() {
+        let directory = unique_temp_path("place-existing-without-hard-link");
+        fs::create_dir_all(&directory).unwrap();
+        let temporary_path = directory.join(".jeanne-martin.toml.tmp");
+        let path = directory.join("jeanne-martin.toml");
+        fs::write(&temporary_path, "replaced").unwrap();
+        fs::write(&path, CONTENTS).unwrap();
+
+        let result =
+            placed_without_overwrite(&temporary_path, &path, "replaced", unsupported_hard_link);
+
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(fs::read_to_string(&path).unwrap(), CONTENTS);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn given_directory_where_no_file_can_be_created_when_saving_then_error_names_the_temporary_file()
+     {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = unique_temp_path("read-only-directory");
+        fs::create_dir_all(&directory).unwrap();
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o555)).unwrap();
+        let storage = DirectoryTenantProfileStorage::new(&directory);
+
+        let errors = [
+            storage.write_new(&jeanne(), CONTENTS).unwrap_err(),
+            storage.overwrite(&jeanne(), CONTENTS).unwrap_err(),
+        ];
+
+        fs::set_permissions(&directory, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::remove_dir_all(&directory).unwrap();
+        for error in errors {
+            let message = error.to_string();
+            assert!(message.contains(".jeanne-martin.toml."), "{message}");
+            assert!(message.contains(".tmp`"), "{message}");
+        }
+    }
+
+    #[test]
+    fn given_existing_profile_when_writing_new_then_error_names_the_profile_file() {
+        let directory = unique_temp_path("write-new-existing-message");
+        let storage = DirectoryTenantProfileStorage::new(&directory);
+        storage.write_new(&jeanne(), CONTENTS).unwrap();
+
+        let message = storage
+            .write_new(&jeanne(), CONTENTS)
+            .unwrap_err()
+            .to_string();
+
+        assert!(message.contains("jeanne-martin.toml`"), "{message}");
+        assert!(!message.contains(".tmp"), "{message}");
         fs::remove_dir_all(directory).unwrap();
     }
 
