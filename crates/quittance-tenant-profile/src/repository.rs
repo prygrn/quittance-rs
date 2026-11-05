@@ -111,9 +111,8 @@ mod tests {
     use std::io;
 
     use super::*;
-    use crate::test_support::{
-        FakeTenantProfileStorage, KNOWN_TEMPLATE_IDS, SAMPLE_TOML, profile_named, sample_profile,
-    };
+    use crate::test_fixtures::{KNOWN_TEMPLATE_IDS, SAMPLE_TOML, profile_named, sample_profile};
+    use crate::test_support::FakeTenantProfileStorage;
 
     fn repository(storage: &FakeTenantProfileStorage) -> TenantProfileRepository<'_> {
         TenantProfileRepository {

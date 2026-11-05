@@ -133,7 +133,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::test_support::unique_temp_path;
+    use crate::test_fixtures::unique_temp_path;
 
     const CONTENTS: &str = "tenant_name = \"Jeanne Martin\"\n";
 

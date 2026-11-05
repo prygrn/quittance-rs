@@ -19,4 +19,6 @@ pub use tenant_profile::{TenantProfile, TenantProfileFields};
 pub use tenant_profile_id::TenantProfileId;
 
 #[cfg(test)]
-mod test_support;
+mod test_fixtures;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;

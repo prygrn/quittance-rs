@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -10,7 +10,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use quittance_core::Date;
 use quittance_mailer::{MailError, Mailer, ReceiptEmail, SmtpConfig};
 use quittance_pdf::{PdfError, PdfRenderer};
-use quittance_tenant_profile::{TenantProfileId, TenantProfileStorage};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tauri::ipc::{InvokeResponseBody, IpcResponse};
@@ -229,74 +228,5 @@ pub(crate) fn sample_tenant_profile_payload() -> TenantProfilePayload {
         property_address: "12 rue des Lilas, 75011 Paris".to_owned(),
         rent_cents: 65_000,
         charges_cents: 5_050,
-    }
-}
-
-/// Fichiers de fiche en mémoire, indexés par nom sans extension ; l'échec programmé
-/// frappe toute opération.
-#[derive(Default)]
-pub(crate) struct FakeTenantProfileStorage {
-    pub files: RefCell<BTreeMap<String, String>>,
-    pub failure: Option<fn() -> io::Error>,
-}
-
-impl FakeTenantProfileStorage {
-    pub(crate) fn with_file(name: &str, contents: &str) -> Self {
-        let storage = Self::default();
-        storage
-            .files
-            .borrow_mut()
-            .insert(name.to_owned(), contents.to_owned());
-        storage
-    }
-
-    pub(crate) fn stored_file_count(&self) -> usize {
-        self.files.borrow().len()
-    }
-
-    /// Modifie le fichier à la main, comme le bailleur pourrait le faire.
-    pub(crate) fn replace_in_file(&self, name: &str, from: &str, to: &str) {
-        let mut files = self.files.borrow_mut();
-        let contents = files.get_mut(name).expect("the file should be stored");
-        *contents = contents.replace(from, to);
-    }
-
-    fn checked(&self) -> io::Result<()> {
-        match self.failure {
-            Some(failure) => Err(failure()),
-            None => Ok(()),
-        }
-    }
-}
-
-impl TenantProfileStorage for FakeTenantProfileStorage {
-    fn stored_names(&self) -> io::Result<Vec<String>> {
-        self.checked()?;
-        Ok(self.files.borrow().keys().cloned().collect())
-    }
-
-    fn read(&self, id: &TenantProfileId) -> io::Result<String> {
-        self.checked()?;
-        self.files
-            .borrow()
-            .get(id.as_str())
-            .cloned()
-            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
-    }
-
-    fn write_new(&self, id: &TenantProfileId, contents: &str) -> io::Result<()> {
-        self.checked()?;
-        if self.files.borrow().contains_key(id.as_str()) {
-            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
-        }
-        self.overwrite(id, contents)
-    }
-
-    fn overwrite(&self, id: &TenantProfileId, contents: &str) -> io::Result<()> {
-        self.checked()?;
-        self.files
-            .borrow_mut()
-            .insert(id.as_str().to_owned(), contents.to_owned());
-        Ok(())
     }
 }

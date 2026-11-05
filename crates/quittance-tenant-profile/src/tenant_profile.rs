@@ -95,7 +95,7 @@ mod tests {
     use quittance_core::PartyError;
 
     use super::*;
-    use crate::test_support::{KNOWN_TEMPLATE_IDS, sample_fields};
+    use crate::test_fixtures::{KNOWN_TEMPLATE_IDS, sample_fields};
 
     #[test]
     fn given_valid_fields_when_creating_profile_then_it_exposes_trimmed_values() {

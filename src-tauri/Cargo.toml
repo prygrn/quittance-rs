@@ -24,3 +24,6 @@ quittance-template = { path = "../crates/quittance-template" }
 quittance-tenant-profile = { path = "../crates/quittance-tenant-profile" }
 serde = { version = "1.0.229", features = ["derive"] }
 tauri = { version = "2.11.6", features = [] }
+
+[dev-dependencies]
+quittance-tenant-profile = { path = "../crates/quittance-tenant-profile", features = ["test-support"] }

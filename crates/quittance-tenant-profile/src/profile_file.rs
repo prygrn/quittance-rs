@@ -64,7 +64,7 @@ mod tests {
 
     use super::*;
     use crate::TenantProfileError;
-    use crate::test_support::{KNOWN_TEMPLATE_IDS, SAMPLE_TOML, sample_profile};
+    use crate::test_fixtures::{KNOWN_TEMPLATE_IDS, SAMPLE_TOML, sample_profile};
 
     fn jeanne() -> TenantProfileId {
         TenantProfileId::parse("jeanne-martin").unwrap()

@@ -80,9 +80,11 @@ fn validated(profile: TenantProfilePayload) -> Result<TenantProfile, CommandErro
 mod tests {
     use std::io;
 
+    use quittance_tenant_profile::test_support::FakeTenantProfileStorage;
+
     use super::*;
     use crate::command_error::CommandErrorCode;
-    use crate::test_support::{FakeTenantProfileStorage, sample_tenant_profile_payload};
+    use crate::test_support::sample_tenant_profile_payload;
 
     fn service(storage: &FakeTenantProfileStorage) -> TenantProfileService<'_> {
         TenantProfileService { storage }
@@ -149,7 +151,7 @@ mod tests {
             let code = code_of(service(&storage).create(payload.clone()));
 
             assert_eq!(code, CommandErrorCode::Validation, "{payload:?}");
-            assert_eq!(storage.stored_file_count(), 0, "{payload:?}");
+            assert_eq!(storage.files.borrow().len(), 0, "{payload:?}");
         }
     }
 
@@ -200,15 +202,15 @@ mod tests {
         let code = code_of(service(&storage).replace(payload));
 
         assert_eq!(code, CommandErrorCode::Validation);
-        assert_eq!(storage.stored_file_count(), 0);
+        assert_eq!(storage.files.borrow().len(), 0);
     }
 
     #[test]
     fn given_profile_that_cannot_be_loaded_when_loading_then_code_is_tenant_profile() {
-        let storage = FakeTenantProfileStorage::with_file(
+        let storage = FakeTenantProfileStorage::with_files([(
             "jeanne-martin",
-            "template_id = \"retired-template\"\n",
-        );
+            "template_id = \"retired-template\"\n".to_owned(),
+        )]);
 
         for id in ["jeanne-martin", "paul-durand", "../.env"] {
             let code = code_of(service(&storage).load(id));
@@ -224,7 +226,14 @@ mod tests {
         service(&storage)
             .create(sample_tenant_profile_payload())
             .unwrap();
-        storage.replace_in_file("jeanne-martin", "\"standard\"", "\"retired-template\"");
+        let edited_by_hand = storage
+            .contents("jeanne-martin")
+            .unwrap()
+            .replace("\"standard\"", "\"retired-template\"");
+        storage
+            .files
+            .borrow_mut()
+            .insert("jeanne-martin".to_owned(), edited_by_hand);
 
         let code = code_of(service(&storage).load("jeanne-martin"));
 
@@ -255,7 +264,8 @@ mod tests {
     #[test]
     fn given_storage_failures_when_listing_or_saving_then_code_is_tenant_profile() {
         let storage = FakeTenantProfileStorage {
-            failure: Some(|| io::Error::from(io::ErrorKind::PermissionDenied)),
+            listing_failure: Some(|| io::Error::from(io::ErrorKind::PermissionDenied)),
+            write_failure: Some(|| io::Error::from(io::ErrorKind::PermissionDenied)),
             ..FakeTenantProfileStorage::default()
         };
 

@@ -10,6 +10,10 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Doublure en mémoire du stockage des fiches, pour les tests des crates appelants.
+test-support = []
+
 [dependencies]
 quittance-core = { path = "../quittance-core" }
 serde = { version = "1.0.229", features = ["derive"] }

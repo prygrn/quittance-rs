@@ -178,10 +178,9 @@ mod tests {
     use super::*;
     use crate::app_config::EnvFileProblem;
     use quittance_tenant_profile::TenantProfileRepository;
+    use quittance_tenant_profile::test_support::FakeTenantProfileStorage;
 
-    use crate::test_support::{
-        FakeTenantProfileStorage, date, from_ipc_json, sample_payload, to_ipc_json,
-    };
+    use crate::test_support::{date, from_ipc_json, sample_payload, to_ipc_json};
 
     /// Erreur produite par `quittance-template` pour un total trop grand pour être écrit
     /// en lettres.
@@ -484,7 +483,8 @@ mod tests {
 
     #[test]
     fn given_malformed_tenant_profile_file_when_converting_then_code_is_tenant_profile() {
-        let storage = FakeTenantProfileStorage::with_file("jeanne-martin", "rent = ");
+        let storage =
+            FakeTenantProfileStorage::with_files([("jeanne-martin", "rent = ".to_owned())]);
         let repository = TenantProfileRepository {
             storage: &storage,
             known_template_ids: &[],
