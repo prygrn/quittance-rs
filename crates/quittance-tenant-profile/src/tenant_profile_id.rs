@@ -10,6 +10,12 @@ pub struct TenantProfileId(String);
 impl TenantProfileId {
     /// Id dérivé du nom du locataire : minuscules, accents français retirés, toute suite
     /// d'autres caractères remplacée par un tiret, sans tiret en tête ni en fin.
+    ///
+    /// Seules les lettres accentuées précomposées (NFC) sont reconnues : un nom en Unicode
+    /// décomposé (NFD), où `é` s'écrit `e` suivi de l'accent combinant U+0301, donne
+    /// `helene` pour « Hélène » en NFC mais `he-le-ne` en NFD, l'accent combinant étant un
+    /// séparateur. Les saisies clavier et les fichiers écrits par l'app sont en NFC ; la
+    /// normalisation demanderait une dépendance.
     pub fn from_tenant_name(tenant_name: &str) -> Result<Self, TenantProfileError> {
         let spelled: String = tenant_name
             .to_lowercase()
