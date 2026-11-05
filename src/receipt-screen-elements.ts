@@ -6,6 +6,19 @@ export interface ReceiptScreenElements {
   /** Regroupe tous les champs et le choix du modèle, désactivés d'un bloc pendant l'envoi. */
   readonly formControls: HTMLFieldSetElement;
   readonly templateSelect: HTMLSelectElement;
+  readonly tenantProfileSelect: HTMLSelectElement;
+  /** Option « aucune fiche », conservée quand la liste des fiches est reconstruite. */
+  readonly tenantProfileEmptyOption: HTMLOptionElement;
+  readonly saveTenantProfileButton: HTMLButtonElement;
+  readonly tenantProfileReplacement: HTMLElement;
+  readonly tenantProfileReplacementName: HTMLElement;
+  readonly replaceTenantProfileButton: HTMLButtonElement;
+  readonly cancelReplaceTenantProfileButton: HTMLButtonElement;
+  readonly tenantProfileSaved: HTMLElement;
+  readonly tenantProfileSavedLabel: HTMLElement;
+  readonly tenantProfileFailure: HTMLElement;
+  readonly tenantProfileFailureTitle: HTMLElement;
+  readonly tenantProfileFailureText: HTMLElement;
   readonly fieldInputs: Readonly<Record<ReceiptFormField, HTMLInputElement | HTMLTextAreaElement>>;
   readonly fieldErrorMessages: Readonly<Record<ReceiptFormField, HTMLElement>>;
   readonly fieldErrorTexts: Readonly<Record<ReceiptFormField, HTMLElement>>;
