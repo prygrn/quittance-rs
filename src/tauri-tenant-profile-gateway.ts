@@ -32,14 +32,14 @@ export function createTauriTenantProfileGateway(dependencies: {
     listTenantProfiles: async (): Promise<readonly TenantProfileEntry[]> => {
       const response = await invokeCommand("list_tenant_profiles", {});
       const entries = Array.isArray(response) ? response.map(toTenantProfileEntry) : null;
-      if (entries === null || entries.includes(null)) {
+      if (!isTenantProfileEntryList(entries)) {
         throw invalidCommandResponseError({
           command: "list_tenant_profiles",
           expected: "TenantProfileEntry[]",
           response,
         });
       }
-      return entries.filter((entry): entry is TenantProfileEntry => entry !== null);
+      return entries;
     },
     loadTenantProfile: async (id: string): Promise<TenantProfilePayload> => {
       const response = await invokeCommand("load_tenant_profile", { id });
@@ -58,6 +58,12 @@ export function createTauriTenantProfileGateway(dependencies: {
     replaceTenantProfile: (profile: TenantProfilePayload): Promise<TenantProfileEntry> =>
       saveTenantProfile({ name: "replace_tenant_profile", profile }),
   };
+}
+
+function isTenantProfileEntryList(
+  entries: readonly (TenantProfileEntry | null)[] | null,
+): entries is readonly TenantProfileEntry[] {
+  return entries !== null && entries.every((entry) => entry !== null);
 }
 
 function toTenantProfileEntry(value: unknown): TenantProfileEntry | null {

@@ -42,6 +42,7 @@ const AMOUNT_FIELDS: readonly AmountField[] = ["rentAmount", "chargesAmount"];
 export function validateTenantProfileForm(
   values: TenantProfileFormValues,
 ): TenantProfileFormResult {
+  // Liste blanche : seuls les champs connus du formulaire sont recopiés.
   const trimmed: TenantProfileFormValues = {
     tenantName: values.tenantName.trim(),
     tenantAddress: values.tenantAddress.trim(),
@@ -52,6 +53,7 @@ export function validateTenantProfileForm(
   };
   const errors: TenantProfileFormErrors = {};
 
+  // Un champ vide n'a qu'une erreur à afficher : « obligatoire » prime sur le format.
   for (const field of TENANT_PROFILE_FORM_FIELDS) {
     if (trimmed[field] === "") {
       errors[field] = "missing";

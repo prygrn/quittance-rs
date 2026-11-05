@@ -1,6 +1,7 @@
 /**
- * Erreur d'une réponse du backend de forme inattendue. Seul le type de la réponse est
- * décrit : son contenu peut porter des données personnelles du locataire.
+ * Erreur d'une réponse du backend de forme inattendue. Sans `code`, elle est traitée comme
+ * `unknown` par l'écran, qui la journalise. Seul le type de la réponse est décrit : son
+ * contenu peut porter des données personnelles du locataire.
  */
 export function invalidCommandResponseError(details: {
   readonly command: string;

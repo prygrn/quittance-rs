@@ -51,6 +51,7 @@ export function validateReceiptForm(values: ReceiptFormValues): ReceiptFormResul
       errors[field] = "invalidDate";
     }
   }
+  // Les dates ISO valides se comparent dans l'ordre lexicographique.
   const hasValidPeriodBounds = errors.periodStart === undefined && errors.periodEnd === undefined;
   if (hasValidPeriodBounds && dates.periodStart > dates.periodEnd) {
     errors.periodEnd = "invertedPeriod";

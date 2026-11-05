@@ -12,7 +12,7 @@ import {
   validateReceiptForm,
 } from "./receipt-form";
 import type { ReceiptGateway } from "./receipt-gateway";
-import type { ReceiptScreenModel, ValidatedAction } from "./receipt-screen-model";
+import type { ReceiptScreenModel } from "./receipt-screen-model";
 import { readReceiptFormValues } from "./read-receipt-form-values";
 import { renderReceiptScreen } from "./render-receipt-screen";
 import {
@@ -25,6 +25,7 @@ import { validateTenantProfileForm } from "./tenant-profile-form";
 import type { TenantProfileGateway } from "./tenant-profile-gateway";
 import type { TenantProfileState } from "./tenant-profile-state";
 import { toCommandErrorCode } from "./to-command-error-code";
+import type { ValidatedAction } from "./validated-action";
 
 const LOG_CODES = {
   TEMPLATE_LISTING_FAILED: "UI_TEMPLATE_LISTING_FAILED",
