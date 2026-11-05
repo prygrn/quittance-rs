@@ -3,6 +3,10 @@ import { COMMAND_ERROR_MESSAGES } from "./command-error-messages";
 import type { ReceiptScreenElements } from "./receipt-screen-elements";
 import type { ReceiptScreenModel } from "./receipt-screen-model";
 import { setText } from "./set-text";
+import { TENANT_PROFILE_FAILURE_MESSAGES } from "./tenant-profile-failure-messages";
+import type { TenantProfileState } from "./tenant-profile-state";
+
+type FailureMessage = Readonly<{ title: string; text: string }>;
 
 /** Reporte l'état des fiches locataire sur leur liste, leur bouton et leurs bandeaux. */
 export function renderTenantProfileControls(options: {
@@ -27,8 +31,21 @@ export function renderTenantProfileControls(options: {
     element: elements.tenantProfileSavedLabel,
     text: state.status === "saved" ? state.entry.label : "",
   });
-  const failure = state.status === "failed" ? COMMAND_ERROR_MESSAGES[state.code] : null;
+  const failure = failureMessageOf(state);
   elements.tenantProfileFailure.hidden = failure === null;
   setText({ element: elements.tenantProfileFailureTitle, text: failure?.title ?? "" });
   setText({ element: elements.tenantProfileFailureText, text: failure?.text ?? "" });
+}
+
+function failureMessageOf(state: TenantProfileState): FailureMessage | null {
+  switch (state.status) {
+    case "failed":
+      return COMMAND_ERROR_MESSAGES[state.code];
+    case "saveRejected":
+      return TENANT_PROFILE_FAILURE_MESSAGES.saveRejected;
+    case "savedUnlisted":
+      return TENANT_PROFILE_FAILURE_MESSAGES.listNotRefreshed;
+    default:
+      return null;
+  }
 }

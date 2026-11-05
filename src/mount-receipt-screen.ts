@@ -221,36 +221,36 @@ export async function mountReceiptScreen(options: {
     );
   };
 
-  const failTenantProfileCommand = (failure: {
-    readonly logCode: string;
-    readonly command: string;
-    readonly reason: unknown;
-  }): void => {
-    console.error(`[${failure.logCode}] ${failure.command} command failed`, failure.reason);
-    update({ tenantProfileState: { status: "failed", code: toCommandErrorCode(failure.reason) } });
+  // Le bouton, désactivé pendant l'enregistrement, a perdu le focus : il le retrouve ensuite.
+  const finishSavingTenantProfile = (tenantProfileState: TenantProfileState): void => {
+    update({ tenantProfileState });
+    elements.saveTenantProfileButton.focus();
   };
 
   const showSavedTenantProfile = async (entry: TenantProfileEntry): Promise<void> => {
     try {
       showTenantProfiles(await tenantProfileGateway.listTenantProfiles());
     } catch (reason: unknown) {
-      failTenantProfileCommand({
-        logCode: LOG_CODES.TENANT_PROFILE_LISTING_FAILED,
-        command: "tenant profile listing",
+      console.error(
+        `[${LOG_CODES.TENANT_PROFILE_LISTING_FAILED}] tenant profile listing command failed after saving`,
         reason,
-      });
+      );
+      finishSavingTenantProfile({ status: "savedUnlisted", entry });
       return;
     }
     elements.tenantProfileSelect.value = entry.id;
-    update({ tenantProfileState: { status: "saved", entry } });
+    finishSavingTenantProfile({ status: "saved", entry });
   };
 
   const failSavingTenantProfile = (reason: unknown): void => {
-    failTenantProfileCommand({
-      logCode: LOG_CODES.TENANT_PROFILE_SAVING_FAILED,
-      command: "tenant profile saving",
+    console.error(
+      `[${LOG_CODES.TENANT_PROFILE_SAVING_FAILED}] tenant profile saving command failed`,
       reason,
-    });
+    );
+    const code = toCommandErrorCode(reason);
+    finishSavingTenantProfile(
+      code === "validation" ? { status: "saveRejected" } : { status: "failed", code },
+    );
   };
 
   const saveTenantProfile = (): void => {
@@ -280,6 +280,7 @@ export async function mountReceiptScreen(options: {
       (reason: unknown) => {
         if (toCommandErrorCode(reason) === "tenantProfileExists") {
           update({ tenantProfileState: { status: "confirmingReplacement", profile } });
+          elements.replaceTenantProfileButton.focus();
           return;
         }
         failSavingTenantProfile(reason);
@@ -301,6 +302,7 @@ export async function mountReceiptScreen(options: {
   const cancelTenantProfileReplacement = (): void => {
     if (model.tenantProfileState.status === "confirmingReplacement") {
       update({ tenantProfileState: IDLE_TENANT_PROFILE_STATE });
+      elements.saveTenantProfileButton.focus();
     }
   };
 
@@ -332,11 +334,11 @@ export async function mountReceiptScreen(options: {
     try {
       showTenantProfiles(await tenantProfileGateway.listTenantProfiles());
     } catch (reason: unknown) {
-      failTenantProfileCommand({
-        logCode: LOG_CODES.TENANT_PROFILE_LISTING_FAILED,
-        command: "tenant profile listing",
+      console.error(
+        `[${LOG_CODES.TENANT_PROFILE_LISTING_FAILED}] tenant profile listing command failed`,
         reason,
-      });
+      );
+      update({ tenantProfileState: { status: "failed", code: toCommandErrorCode(reason) } });
     }
   };
 
