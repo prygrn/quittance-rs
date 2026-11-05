@@ -36,7 +36,8 @@ impl CommandErrorCode {
             Self::Pdf => "pdf",
             Self::Mail => "mail",
             Self::Config => "config",
-            Self::TenantProfile | Self::TenantProfileExists => todo!(),
+            Self::TenantProfile => "tenantProfile",
+            Self::TenantProfileExists => "tenantProfileExists",
             Self::Unknown => "unknown",
         }
     }
@@ -133,15 +134,19 @@ impl From<MailError> for CommandError {
 /// enveloppée dans [`TenantProfileStorageError`].
 impl From<TenantProfileError> for CommandError {
     fn from(error: TenantProfileError) -> Self {
-        let _ = error;
-        todo!()
+        Self::from_error(CommandErrorCode::Validation, &error)
     }
 }
 
 impl From<TenantProfileStorageError> for CommandError {
     fn from(error: TenantProfileStorageError) -> Self {
-        let _ = (error, CommandErrorCode::TenantProfileExists);
-        todo!()
+        let code = match error {
+            TenantProfileStorageError::AlreadyExists { .. } => {
+                CommandErrorCode::TenantProfileExists
+            }
+            _ => CommandErrorCode::TenantProfile,
+        };
+        Self::from_error(code, &error)
     }
 }
 

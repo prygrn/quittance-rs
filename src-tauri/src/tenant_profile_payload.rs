@@ -18,15 +18,29 @@ pub struct TenantProfilePayload {
 impl TenantProfilePayload {
     /// Champs de la fiche, que `quittance-tenant-profile` valide ensuite.
     pub fn into_fields(self) -> TenantProfileFields {
-        let _ = self;
-        todo!()
+        TenantProfileFields {
+            template_id: self.template_id,
+            tenant_name: self.tenant_name,
+            tenant_address: self.tenant_address,
+            tenant_email: self.tenant_email,
+            property_address: self.property_address,
+            rent_cents: self.rent_cents,
+            charges_cents: self.charges_cents,
+        }
     }
 }
 
 impl From<&TenantProfile> for TenantProfilePayload {
     fn from(profile: &TenantProfile) -> Self {
-        let _ = profile;
-        todo!()
+        Self {
+            template_id: profile.template_id().to_owned(),
+            tenant_name: profile.tenant().name().to_owned(),
+            tenant_address: profile.tenant().address().to_owned(),
+            tenant_email: profile.tenant().email().to_owned(),
+            property_address: profile.property_address().to_owned(),
+            rent_cents: profile.rent().cents(),
+            charges_cents: profile.charges().cents(),
+        }
     }
 }
 

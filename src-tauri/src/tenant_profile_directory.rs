@@ -8,8 +8,7 @@ const TENANT_PROFILE_DIRECTORY_NAME: &str = "fiches";
 
 /// Dossier `fiches/` de l'exécutable ; il peut ne pas exister encore.
 pub fn tenant_profile_directory() -> io::Result<PathBuf> {
-    let _ = (executable_directory, TENANT_PROFILE_DIRECTORY_NAME);
-    todo!()
+    Ok(executable_directory()?.join(TENANT_PROFILE_DIRECTORY_NAME))
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use quittance_tenant_profile::TenantProfileStorage;
+use quittance_tenant_profile::{TenantProfile, TenantProfileRepository, TenantProfileStorage};
 
 use crate::command_error::CommandError;
 use crate::tenant_profile_entry_payload::TenantProfileEntryPayload;
@@ -6,7 +6,10 @@ use crate::tenant_profile_payload::TenantProfilePayload;
 
 /// Templates de quittance qu'une fiche peut désigner.
 pub(crate) fn known_template_ids() -> Vec<&'static str> {
-    todo!()
+    quittance_template::list_templates()
+        .into_iter()
+        .map(|template| template.id)
+        .collect()
 }
 
 /// Orchestration des commandes de fiche locataire. Une fiche ne peut désigner qu'un template
@@ -18,17 +21,16 @@ pub struct TenantProfileService<'a> {
 impl TenantProfileService<'_> {
     /// Fiches enregistrées, triées par libellé.
     pub fn list(&self) -> Result<Vec<TenantProfileEntryPayload>, CommandError> {
-        let _ = (
-            self.storage,
-            known_template_ids,
-            TenantProfilePayload::into_fields,
-        );
-        todo!()
+        let entries = self.with_repository(|repository| repository.list())?;
+        Ok(entries
+            .into_iter()
+            .map(TenantProfileEntryPayload::from)
+            .collect())
     }
 
     pub fn load(&self, id: &str) -> Result<TenantProfilePayload, CommandError> {
-        let _ = id;
-        todo!()
+        let profile = self.with_repository(|repository| repository.load(id))?;
+        Ok(TenantProfilePayload::from(&profile))
     }
 
     /// Enregistre une nouvelle fiche ; `tenantProfileExists` si une fiche de même id existe.
@@ -36,8 +38,9 @@ impl TenantProfileService<'_> {
         &self,
         profile: TenantProfilePayload,
     ) -> Result<TenantProfileEntryPayload, CommandError> {
-        let _ = profile;
-        todo!()
+        let profile = validated(profile)?;
+        let entry = self.with_repository(|repository| repository.create(&profile))?;
+        Ok(TenantProfileEntryPayload::from(entry))
     }
 
     /// Enregistre la fiche, en écrasant celle de même id.
@@ -45,9 +48,32 @@ impl TenantProfileService<'_> {
         &self,
         profile: TenantProfilePayload,
     ) -> Result<TenantProfileEntryPayload, CommandError> {
-        let _ = profile;
-        todo!()
+        let profile = validated(profile)?;
+        let entry = self.with_repository(|repository| repository.replace(&profile))?;
+        Ok(TenantProfileEntryPayload::from(entry))
     }
+
+    fn with_repository<T, Error>(
+        &self,
+        action: impl FnOnce(&TenantProfileRepository<'_>) -> Result<T, Error>,
+    ) -> Result<T, CommandError>
+    where
+        CommandError: From<Error>,
+    {
+        let known_template_ids = known_template_ids();
+        let repository = TenantProfileRepository {
+            storage: self.storage,
+            known_template_ids: &known_template_ids,
+        };
+        Ok(action(&repository)?)
+    }
+}
+
+fn validated(profile: TenantProfilePayload) -> Result<TenantProfile, CommandError> {
+    Ok(TenantProfile::new(
+        profile.into_fields(),
+        &known_template_ids(),
+    )?)
 }
 
 #[cfg(test)]

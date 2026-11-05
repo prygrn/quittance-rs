@@ -10,8 +10,10 @@ pub struct TenantProfileEntryPayload {
 
 impl From<TenantProfileEntry> for TenantProfileEntryPayload {
     fn from(entry: TenantProfileEntry) -> Self {
-        let _ = entry;
-        todo!()
+        Self {
+            id: entry.id,
+            label: entry.label,
+        }
     }
 }
 
