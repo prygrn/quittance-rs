@@ -28,13 +28,13 @@ impl DirectoryTenantProfileStorage {
     }
 }
 
-/// Nom sans extension de chaque fichier `.toml` parmi les entrées d'un dossier.
+/// Nom sans extension de chaque fichier `.toml` parmi les entrées d'un dossier. Une entrée
+/// illisible est ignorée : elle n'empêche pas de lister les autres fiches.
 fn profile_file_names(
     entries: impl Iterator<Item = io::Result<PathBuf>>,
 ) -> io::Result<Vec<String>> {
     let mut names = Vec::new();
-    for entry in entries {
-        let path = entry?;
+    for path in entries.flatten() {
         let is_profile_file = path.is_file()
             && path
                 .extension()
