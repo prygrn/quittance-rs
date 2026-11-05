@@ -90,7 +90,7 @@ charges = "50,50"
 ```
 
 - **Validation** : une fiche est vérifiée à l'enregistrement et au chargement, comme une quittance (email, adresses, montants) ; son `template_id` doit désigner un template existant. Une fiche illisible ou invalide reste listée sous son id et son chargement échoue avec un message d'erreur.
-- **Suppression, renommage** : l'interface n'en propose pas ; supprimer ou renommer le fichier à la main.
+- **Suppression** : l'interface n'en propose pas ; supprimer le fichier à la main.
 - **Confidentialité** : les fiches contiennent des données personnelles ; `fiches/` est ignoré par git et ne doit jamais être commité.
 
 ## Développement
