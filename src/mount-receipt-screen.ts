@@ -222,10 +222,14 @@ export async function mountReceiptScreen(options: {
     );
   };
 
-  // Le bouton, désactivé pendant l'enregistrement, a perdu le focus : il le retrouve ensuite.
+  // Le bouton, désactivé pendant l'enregistrement, perd le focus : il le retrouve ensuite,
+  // sauf si l'utilisateur l'a placé ailleurs entre-temps, pour ne pas interrompre sa saisie.
   const finishSavingTenantProfile = (tenantProfileState: TenantProfileState): void => {
     update({ tenantProfileState });
-    elements.saveTenantProfileButton.focus();
+    const { activeElement, body } = elements.form.ownerDocument;
+    if (activeElement === null || activeElement === body) {
+      elements.saveTenantProfileButton.focus();
+    }
   };
 
   const showSavedTenantProfile = async (entry: TenantProfileEntry): Promise<void> => {
@@ -294,6 +298,8 @@ export async function mountReceiptScreen(options: {
     if (state.status !== "confirmingReplacement") {
       return;
     }
+    // Le bouton masqué ne garderait le focus que selon le moteur : il le rend explicitement.
+    elements.replaceTenantProfileButton.blur();
     update({ tenantProfileState: { status: "saving" } });
     tenantProfileGateway
       .replaceTenantProfile(state.profile)
