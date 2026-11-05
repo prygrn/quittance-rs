@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 use crate::{TenantProfileId, TenantProfileStorage};
 
-/// Fiches enregistrées dans un dossier, un fichier `<id>.toml` par fiche. Le dossier est
-/// créé au premier enregistrement.
 const FILE_EXTENSION: &str = "toml";
 
+/// Fiches enregistrées dans un dossier, un fichier `<id>.toml` par fiche. Le dossier est
+/// créé au premier enregistrement.
 pub struct DirectoryTenantProfileStorage {
     directory: PathBuf,
 }
