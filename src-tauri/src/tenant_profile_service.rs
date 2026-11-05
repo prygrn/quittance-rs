@@ -241,6 +241,23 @@ mod tests {
     }
 
     #[test]
+    fn given_file_renamed_by_hand_when_loading_then_code_is_tenant_profile() {
+        let storage = FakeTenantProfileStorage::default();
+        service(&storage)
+            .create(sample_tenant_profile_payload())
+            .unwrap();
+        let contents = storage.contents("jeanne-martin").unwrap();
+        storage
+            .files
+            .borrow_mut()
+            .insert("jeanne".to_owned(), contents);
+
+        let code = code_of(service(&storage).load("jeanne"));
+
+        assert_eq!(code, CommandErrorCode::TenantProfile);
+    }
+
+    #[test]
     fn given_stored_profiles_when_listing_then_entries_are_sorted_by_label() {
         let storage = FakeTenantProfileStorage::default();
         service(&storage)

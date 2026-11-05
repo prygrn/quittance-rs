@@ -165,6 +165,24 @@ mod tests {
     }
 
     #[test]
+    fn given_file_named_after_another_id_than_its_tenant_name_when_reading_then_value_is_invalid() {
+        let file_id = TenantProfileId::parse("jeanne").unwrap();
+
+        let result = profile_from_toml(&file_id, SAMPLE_TOML, KNOWN_TEMPLATE_IDS);
+
+        assert!(
+            matches!(
+                &result,
+                Err(TenantProfileStorageError::Invalid {
+                    id,
+                    source: TenantProfileError::MismatchedId { file_id, derived_id, .. },
+                }) if id == "jeanne" && file_id == "jeanne" && derived_id == "jeanne-martin"
+            ),
+            "got {result:?}"
+        );
+    }
+
+    #[test]
     fn given_unknown_template_in_file_when_reading_then_value_is_invalid() {
         let contents = SAMPLE_TOML.replace("\"standard\"", "\"fancy\"");
 

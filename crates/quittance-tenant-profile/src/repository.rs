@@ -180,6 +180,16 @@ mod tests {
     }
 
     #[test]
+    fn given_file_whose_name_differs_from_its_tenant_name_id_when_listing_then_it_is_listed_by_id()
+    {
+        let storage = FakeTenantProfileStorage::with_files([("jeanne", SAMPLE_TOML.to_owned())]);
+
+        let entries = repository(&storage).list().unwrap();
+
+        assert_eq!(entries, [entry("jeanne", "jeanne")]);
+    }
+
+    #[test]
     fn given_storage_that_cannot_be_listed_when_listing_then_it_is_unlistable() {
         let storage = FakeTenantProfileStorage {
             listing_failure: Some(|| io::Error::from(io::ErrorKind::PermissionDenied)),

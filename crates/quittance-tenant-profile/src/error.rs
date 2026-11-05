@@ -18,6 +18,16 @@ pub enum TenantProfileError {
     EmptyId { tenant_name: String },
     #[error("`{field}` amount `{value}` is not a euro amount such as `650,00`")]
     InvalidAmount { field: &'static str, value: String },
+    /// Fichier renommé ou nom du locataire modifié à la main : la fiche ne serait plus
+    /// enregistrée sous le même fichier.
+    #[error(
+        "tenant name `{tenant_name}` yields the id `{derived_id}`, not the file id `{file_id}`"
+    )]
+    MismatchedId {
+        file_id: String,
+        derived_id: String,
+        tenant_name: String,
+    },
 }
 
 /// Échec de lecture ou d'écriture d'une fiche enregistrée.
