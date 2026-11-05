@@ -2874,6 +2874,7 @@ dependencies = [
  "quittance-pdf",
  "quittance-signature",
  "quittance-template",
+ "quittance-tenant-profile",
  "serde",
  "tauri",
  "tauri-build",

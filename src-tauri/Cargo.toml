@@ -21,5 +21,6 @@ quittance-mailer = { path = "../crates/quittance-mailer" }
 quittance-pdf = { path = "../crates/quittance-pdf" }
 quittance-signature = { path = "../crates/quittance-signature" }
 quittance-template = { path = "../crates/quittance-template" }
+quittance-tenant-profile = { path = "../crates/quittance-tenant-profile" }
 serde = { version = "1.0.229", features = ["derive"] }
 tauri = { version = "2.11.6", features = [] }

@@ -6,6 +6,7 @@ use quittance_mailer::MailError;
 use quittance_pdf::PdfError;
 use quittance_signature::SignatureError;
 use quittance_template::TemplateError;
+use quittance_tenant_profile::{TenantProfileError, TenantProfileStorageError};
 use serde::{Serialize, Serializer};
 
 use crate::app_config::ConfigError;
@@ -20,6 +21,8 @@ pub enum CommandErrorCode {
     Pdf,
     Mail,
     Config,
+    TenantProfile,
+    TenantProfileExists,
     Unknown,
 }
 
@@ -33,6 +36,7 @@ impl CommandErrorCode {
             Self::Pdf => "pdf",
             Self::Mail => "mail",
             Self::Config => "config",
+            Self::TenantProfile | Self::TenantProfileExists => todo!(),
             Self::Unknown => "unknown",
         }
     }
@@ -125,6 +129,22 @@ impl From<MailError> for CommandError {
     }
 }
 
+/// Saisie de fiche invalide à l'enregistrement. Au chargement, la même erreur arrive
+/// enveloppée dans [`TenantProfileStorageError`].
+impl From<TenantProfileError> for CommandError {
+    fn from(error: TenantProfileError) -> Self {
+        let _ = error;
+        todo!()
+    }
+}
+
+impl From<TenantProfileStorageError> for CommandError {
+    fn from(error: TenantProfileStorageError) -> Self {
+        let _ = (error, CommandErrorCode::TenantProfileExists);
+        todo!()
+    }
+}
+
 /// Message de l'erreur suivi de ses causes, chacune omise si le message la reprend déjà.
 fn message_with_causes(error: &dyn Error) -> String {
     let mut message = error.to_string();
@@ -152,7 +172,11 @@ mod tests {
 
     use super::*;
     use crate::app_config::EnvFileProblem;
-    use crate::test_support::{date, from_ipc_json, sample_payload, to_ipc_json};
+    use quittance_tenant_profile::TenantProfileRepository;
+
+    use crate::test_support::{
+        FakeTenantProfileStorage, date, from_ipc_json, sample_payload, to_ipc_json,
+    };
 
     /// Erreur produite par `quittance-template` pour un total trop grand pour être écrit
     /// en lettres.
@@ -200,6 +224,8 @@ mod tests {
             (CommandErrorCode::Pdf, "pdf"),
             (CommandErrorCode::Mail, "mail"),
             (CommandErrorCode::Config, "config"),
+            (CommandErrorCode::TenantProfile, "tenantProfile"),
+            (CommandErrorCode::TenantProfileExists, "tenantProfileExists"),
             (CommandErrorCode::Unknown, "unknown"),
         ];
 
@@ -369,6 +395,96 @@ mod tests {
 
             assert_eq!(command_error.code(), CommandErrorCode::Mail);
         }
+    }
+
+    #[test]
+    fn given_tenant_profile_errors_when_converting_then_code_is_validation() {
+        let errors = [
+            TenantProfileError::UnknownTemplate("fancy".to_owned()),
+            TenantProfileError::InvalidTenant(PartyError::MissingEmail),
+            TenantProfileError::MissingPropertyAddress,
+            TenantProfileError::TotalOverflow {
+                rent_cents: u64::MAX,
+                charges_cents: 1,
+            },
+            TenantProfileError::EmptyId {
+                tenant_name: "!!!".to_owned(),
+            },
+            TenantProfileError::InvalidAmount {
+                field: "rent",
+                value: "650.00".to_owned(),
+            },
+        ];
+
+        for error in errors {
+            let command_error = CommandError::from(error);
+
+            assert_eq!(command_error.code(), CommandErrorCode::Validation);
+        }
+    }
+
+    #[test]
+    fn given_tenant_profile_storage_errors_when_converting_then_code_is_tenant_profile() {
+        let id = || "jeanne-martin".to_owned();
+        let errors = [
+            TenantProfileStorageError::InvalidId("../.env".to_owned()),
+            TenantProfileStorageError::NotFound { id: id() },
+            TenantProfileStorageError::Unlistable(io::Error::from(io::ErrorKind::PermissionDenied)),
+            TenantProfileStorageError::Unreadable {
+                id: id(),
+                source: io::Error::from(io::ErrorKind::InvalidData),
+            },
+            TenantProfileStorageError::Invalid {
+                id: id(),
+                source: TenantProfileError::MissingPropertyAddress,
+            },
+            TenantProfileStorageError::Unwritable {
+                id: id(),
+                source: io::Error::from(io::ErrorKind::PermissionDenied),
+            },
+        ];
+
+        for error in errors {
+            let command_error = CommandError::from(error);
+
+            assert_eq!(command_error.code(), CommandErrorCode::TenantProfile);
+            assert!(
+                command_error.message().contains("jeanne-martin")
+                    || command_error.message().contains("../.env")
+                    || command_error.message().contains("listed"),
+                "{command_error}"
+            );
+        }
+    }
+
+    #[test]
+    fn given_malformed_tenant_profile_file_when_converting_then_code_is_tenant_profile() {
+        let storage = FakeTenantProfileStorage::with_file("jeanne-martin", "rent = ");
+        let repository = TenantProfileRepository {
+            storage: &storage,
+            known_template_ids: &[],
+        };
+        let error = repository.load("jeanne-martin").unwrap_err();
+        assert!(
+            matches!(error, TenantProfileStorageError::Malformed { .. }),
+            "got {error:?}"
+        );
+
+        let command_error = CommandError::from(error);
+
+        assert_eq!(command_error.code(), CommandErrorCode::TenantProfile);
+    }
+
+    #[test]
+    fn given_existing_tenant_profile_when_converting_then_code_is_tenant_profile_exists() {
+        let error = TenantProfileStorageError::AlreadyExists {
+            id: "jeanne-martin".to_owned(),
+        };
+
+        let command_error = CommandError::from(error);
+
+        assert_eq!(command_error.code(), CommandErrorCode::TenantProfileExists);
+        assert!(command_error.message().contains("jeanne-martin"));
     }
 
     #[test]
