@@ -1,10 +1,14 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{TenantProfileId, TenantProfileStorage};
 
 const FILE_EXTENSION: &str = "toml";
+/// Extension des fichiers en cours d'écriture : un fichier abandonné n'est jamais listé.
+const TEMPORARY_FILE_EXTENSION: &str = "tmp";
 
 /// Fiches enregistrées dans un dossier, un fichier `<id>.toml` par fiche. Le dossier est
 /// créé au premier enregistrement.
@@ -26,6 +30,45 @@ impl DirectoryTenantProfileStorage {
     fn created_directory(&self) -> io::Result<()> {
         fs::create_dir_all(&self.directory).map_err(|error| located(&self.directory, error))
     }
+
+    /// Écrit la fiche dans un fichier temporaire du dossier, puis `place` le met à la place
+    /// du fichier de la fiche : un arrêt en cours d'écriture ne laisse jamais de fiche
+    /// tronquée, et un lien symbolique posé à la place de la fiche n'est jamais suivi.
+    fn write_through_temporary_file(
+        &self,
+        id: &TenantProfileId,
+        contents: &str,
+        place: impl FnOnce(&Path, &Path) -> io::Result<()>,
+    ) -> io::Result<()> {
+        self.created_directory()?;
+        let path = self.file_path(id);
+        let temporary_path = self.temporary_file_path(id)?;
+        let result = synced_new_file(&temporary_path, contents)
+            .and_then(|()| place(&temporary_path, &path))
+            .map_err(|error| located(&path, error));
+        // Nettoyage au mieux : après un renommage le fichier n'existe plus, et un fichier
+        // temporaire restant n'est jamais lu comme une fiche.
+        let _ = fs::remove_file(&temporary_path);
+        result
+    }
+
+    fn temporary_file_path(&self, id: &TenantProfileId) -> io::Result<PathBuf> {
+        let nanoseconds = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(io::Error::other)?
+            .as_nanos();
+        Ok(self.directory.join(format!(
+            ".{id}.{FILE_EXTENSION}.{}-{nanoseconds}.{TEMPORARY_FILE_EXTENSION}",
+            process::id()
+        )))
+    }
+}
+
+/// Crée le fichier, qui ne doit pas exister, et attend que son contenu soit sur le disque.
+fn synced_new_file(path: &Path, contents: &str) -> io::Result<()> {
+    let mut file = File::create_new(path)?;
+    file.write_all(contents.as_bytes())?;
+    file.sync_all()
 }
 
 /// Nom sans extension de chaque fichier `.toml` parmi les entrées d'un dossier. Une entrée
@@ -70,18 +113,17 @@ impl TenantProfileStorage for DirectoryTenantProfileStorage {
         fs::read_to_string(&path).map_err(|error| located(&path, error))
     }
 
+    /// Un lien physique, contrairement à un renommage, échoue si la fiche existe déjà.
     fn write_new(&self, id: &TenantProfileId, contents: &str) -> io::Result<()> {
-        self.created_directory()?;
-        let path = self.file_path(id);
-        File::create_new(&path)
-            .and_then(|mut file| file.write_all(contents.as_bytes()))
-            .map_err(|error| located(&path, error))
+        self.write_through_temporary_file(id, contents, |temporary_path, path| {
+            fs::hard_link(temporary_path, path)
+        })
     }
 
     fn overwrite(&self, id: &TenantProfileId, contents: &str) -> io::Result<()> {
-        self.created_directory()?;
-        let path = self.file_path(id);
-        fs::write(&path, contents).map_err(|error| located(&path, error))
+        self.write_through_temporary_file(id, contents, |temporary_path, path| {
+            fs::rename(temporary_path, path)
+        })
     }
 }
 
