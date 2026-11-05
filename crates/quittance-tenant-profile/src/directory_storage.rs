@@ -161,6 +161,61 @@ mod tests {
     }
 
     #[test]
+    fn given_profiles_written_when_listing_the_directory_then_no_temporary_file_is_left() {
+        let directory = unique_temp_path("no-temporary-file");
+        let storage = DirectoryTenantProfileStorage::new(&directory);
+
+        storage.write_new(&jeanne(), CONTENTS).unwrap();
+        storage.overwrite(&jeanne(), "replaced").unwrap();
+        let _ = storage.write_new(&jeanne(), "refused");
+
+        let file_names: Vec<_> = fs::read_dir(&directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(file_names, ["jeanne-martin.toml"]);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn given_symbolic_link_in_place_of_the_profile_when_overwriting_then_link_target_is_untouched()
+    {
+        let directory = unique_temp_path("overwrite-symlink");
+        let outside = unique_temp_path("overwrite-symlink-target");
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(&outside, "outside").unwrap();
+        std::os::unix::fs::symlink(&outside, directory.join("jeanne-martin.toml")).unwrap();
+        let storage = DirectoryTenantProfileStorage::new(&directory);
+
+        storage.overwrite(&jeanne(), CONTENTS).unwrap();
+
+        assert_eq!(fs::read_to_string(&outside).unwrap(), "outside");
+        let profile_path = directory.join("jeanne-martin.toml");
+        assert!(!profile_path.symlink_metadata().unwrap().is_symlink());
+        assert_eq!(fs::read_to_string(profile_path).unwrap(), CONTENTS);
+        fs::remove_dir_all(directory).unwrap();
+        fs::remove_file(outside).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn given_dangling_symbolic_link_in_place_of_the_profile_when_writing_new_then_it_already_exists()
+     {
+        let directory = unique_temp_path("write-new-symlink");
+        let outside = unique_temp_path("write-new-symlink-target");
+        fs::create_dir_all(&directory).unwrap();
+        std::os::unix::fs::symlink(&outside, directory.join("jeanne-martin.toml")).unwrap();
+        let storage = DirectoryTenantProfileStorage::new(&directory);
+
+        let result = storage.write_new(&jeanne(), CONTENTS);
+
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+        assert!(!outside.exists());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn given_missing_file_when_reading_then_error_is_not_found_and_names_the_file() {
         let directory = unique_temp_path("read-missing");
         let storage = DirectoryTenantProfileStorage::new(&directory);
