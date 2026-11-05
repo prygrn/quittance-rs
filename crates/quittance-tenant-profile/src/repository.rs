@@ -172,9 +172,9 @@ mod tests {
         assert_eq!(
             entries,
             [
+                entry("broken", "broken"),
                 entry("Notes Perso", "Notes Perso"),
-                entry("zoe-bernard", "Zoé Bernard"),
-                entry("broken", "broken")
+                entry("zoe-bernard", "Zoé Bernard")
             ]
         );
     }
@@ -187,6 +187,30 @@ mod tests {
         let entries = repository(&storage).list().unwrap();
 
         assert_eq!(entries, [entry("jeanne", "jeanne")]);
+    }
+
+    #[test]
+    fn given_labels_differing_in_case_and_accents_when_listing_then_they_are_sorted_ignoring_both()
+    {
+        let named = |tenant_name: &str| SAMPLE_TOML.replace("Jeanne Martin", tenant_name);
+        let storage = FakeTenantProfileStorage::with_files([
+            ("zoe-bernard", named("Zoé Bernard")),
+            ("elodie-petit", named("Élodie Petit")),
+            ("anne-roy", named("anne Roy")),
+            ("Elodie Petit", named("Elodie Petit")),
+        ]);
+
+        let entries = repository(&storage).list().unwrap();
+
+        assert_eq!(
+            entries,
+            [
+                entry("anne-roy", "anne Roy"),
+                entry("Elodie Petit", "Elodie Petit"),
+                entry("elodie-petit", "Élodie Petit"),
+                entry("zoe-bernard", "Zoé Bernard")
+            ]
+        );
     }
 
     #[test]
