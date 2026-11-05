@@ -17,12 +17,7 @@ impl TenantProfileId {
     /// séparateur. Les saisies clavier et les fichiers écrits par l'app sont en NFC ; la
     /// normalisation demanderait une dépendance.
     pub fn from_tenant_name(tenant_name: &str) -> Result<Self, TenantProfileError> {
-        let spelled: String = tenant_name
-            .to_lowercase()
-            .chars()
-            .map(without_french_accent)
-            .collect();
-        let id = spelled
+        let id = folded(tenant_name)
             .split(|character: char| !character.is_ascii_alphanumeric())
             .filter(|word| !word.is_empty())
             .collect::<Vec<_>>()
@@ -72,6 +67,14 @@ const FRENCH_LETTERS: [(char, &str); 18] = [
     ('ü', "u"),
     ('ÿ', "y"),
 ];
+
+/// Texte en minuscules, accents français retirés : `Élodie` devient `elodie`.
+pub(crate) fn folded(text: &str) -> String {
+    text.to_lowercase()
+        .chars()
+        .map(without_french_accent)
+        .collect()
+}
 
 fn without_french_accent(character: char) -> String {
     FRENCH_LETTERS

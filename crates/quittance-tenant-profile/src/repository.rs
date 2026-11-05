@@ -1,6 +1,7 @@
 use std::io;
 
 use crate::profile_file::{profile_from_toml, profile_toml};
+use crate::tenant_profile_id::folded;
 use crate::{TenantProfile, TenantProfileId, TenantProfileStorage, TenantProfileStorageError};
 
 /// Fiche proposée à l'UI : `label` est le nom du locataire, ou l'id si la fiche ne peut
@@ -19,7 +20,8 @@ pub struct TenantProfileRepository<'a> {
 }
 
 impl TenantProfileRepository<'_> {
-    /// Une entrée par fichier de fiche, triée par libellé. Une fiche illisible ou invalide
+    /// Une entrée par fichier de fiche, triée par libellé sans tenir compte de la casse ni des
+    /// accents, puis par libellé brut en cas d'égalité. Une fiche illisible ou invalide
     /// n'empêche pas de lister les autres.
     pub fn list(&self) -> Result<Vec<TenantProfileEntry>, TenantProfileStorageError> {
         let names = self
@@ -36,7 +38,9 @@ impl TenantProfileRepository<'_> {
                 id: name,
             })
             .collect();
-        entries.sort_by(|left, right| (&left.label, &left.id).cmp(&(&right.label, &right.id)));
+        entries.sort_by_cached_key(|entry| {
+            (folded(&entry.label), entry.label.clone(), entry.id.clone())
+        });
         Ok(entries)
     }
 
