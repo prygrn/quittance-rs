@@ -189,6 +189,22 @@ mod tests {
     }
 
     #[test]
+    fn given_directory_entry_in_error_when_listing_then_it_is_skipped_and_the_others_are_listed() {
+        let directory = unique_temp_path("list-entry-error");
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("paul-durand.toml"), CONTENTS).unwrap();
+        let entries = [
+            Err(io::Error::from(io::ErrorKind::PermissionDenied)),
+            Ok(directory.join("paul-durand.toml")),
+        ];
+
+        let names = profile_file_names(entries.into_iter());
+
+        assert_eq!(names.unwrap(), ["paul-durand"]);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn given_directory_path_taken_by_a_file_when_listing_or_writing_then_both_fail() {
         let file_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
         let storage = DirectoryTenantProfileStorage::new(file_path);
