@@ -2,6 +2,14 @@
 export interface WebDriverReadyClock {
   readonly now: () => number;
   readonly sleep: (durationMs: number) => Promise<void>;
+  /** Signal annulé après durationMs, comme `AbortSignal.timeout`. */
+  readonly timeoutSignal: (durationMs: number) => AbortSignal;
+}
+
+/** Requête `GET /status`, annulée par son signal si le serveur ne répond pas à temps. */
+export interface WebDriverStatusRequest {
+  readonly url: string;
+  readonly signal: AbortSignal;
 }
 
 /** Paramètres de waitForWebDriverReady. */
@@ -10,7 +18,7 @@ export interface WaitForWebDriverReadyOptions {
   readonly statusUrl: string;
   readonly timeoutMs: number;
   readonly pollIntervalMs: number;
-  readonly fetch: (url: string) => Promise<Response>;
+  readonly fetch: (request: WebDriverStatusRequest) => Promise<Response>;
   readonly clock: WebDriverReadyClock;
 }
 
@@ -18,7 +26,10 @@ async function describeStatusFailure(
   options: WaitForWebDriverReadyOptions,
 ): Promise<string | null> {
   try {
-    const response = await options.fetch(options.statusUrl);
+    const response = await options.fetch({
+      url: options.statusUrl,
+      signal: new AbortController().signal,
+    });
     return response.ok ? null : `HTTP ${response.status}`;
   } catch (err: unknown) {
     return err instanceof Error ? `${err.message} (${String(err.cause)})` : String(err);

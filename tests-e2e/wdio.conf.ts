@@ -3,7 +3,10 @@ import { fileURLToPath } from "node:url";
 
 import { appEnvironment } from "./support/app-environment";
 import { TIMEOUTS_MS } from "./support/timeouts-ms";
-import { waitForWebDriverReady } from "./support/wait-for-web-driver-ready";
+import {
+  type WebDriverStatusRequest,
+  waitForWebDriverReady,
+} from "./support/wait-for-web-driver-ready";
 
 // Binaire produit par `tauri build --no-bundle` (cible `make test-e2e`), front embarqué.
 const APPLICATION_PATH = fileURLToPath(new URL("../target/release/quittance-app", import.meta.url));
@@ -57,11 +60,13 @@ async function startTauriDriver(): Promise<void> {
       statusUrl: `http://127.0.0.1:${TAURI_DRIVER_PORT}/status`,
       timeoutMs: TIMEOUTS_MS.driverStartup,
       pollIntervalMs: TAURI_DRIVER_STATUS_POLL_INTERVAL_MS,
-      fetch: (url: string): Promise<Response> => fetch(url),
+      fetch: (request: WebDriverStatusRequest): Promise<Response> =>
+        fetch(request.url, { signal: request.signal }),
       clock: {
         now: (): number => Date.now(),
         sleep: (durationMs: number): Promise<void> =>
           new Promise((resolve) => setTimeout(resolve, durationMs)),
+        timeoutSignal: (durationMs: number): AbortSignal => AbortSignal.timeout(durationMs),
       },
     });
   } catch (err: unknown) {
