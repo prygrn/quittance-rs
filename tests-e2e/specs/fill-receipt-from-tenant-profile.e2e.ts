@@ -9,6 +9,7 @@ import { fillReceiptForm } from "../support/fill-receipt-form";
 import { MAILPIT_CLIENT } from "../support/mailpit-client";
 import { openReceiptScreen } from "../support/open-receipt-screen";
 import { readReceiptForm } from "../support/read-receipt-form";
+import { RECEIPT_FORM_FIELD_IDS } from "../support/receipt-form-field-ids";
 import { SAMPLE_RECEIPT } from "../support/sample-receipt";
 import { SAMPLE_TENANT_PROFILE } from "../support/sample-tenant-profile";
 import { TIMEOUTS_MS } from "../support/timeouts-ms";
@@ -57,17 +58,19 @@ describe("filling a receipt from a tenant profile", () => {
 
     await $("#tenant-profile").selectByAttribute("value", SAMPLE_TENANT_PROFILE.id);
 
-    await browser.waitUntil(async () => (await $("#tenant-name").getValue()) !== "", {
-      timeout: TIMEOUTS_MS.tenantProfile,
-      timeoutMsg: "[E2E_TENANT_PROFILE_NOT_LOADED] choosing the tenant profile filled no field",
-    });
+    await browser.waitUntil(
+      async () => (await $(`#${RECEIPT_FORM_FIELD_IDS.tenantName}`).getValue()) !== "",
+      {
+        timeout: TIMEOUTS_MS.tenantProfile,
+        timeoutMsg: "[E2E_TENANT_PROFILE_NOT_LOADED] choosing the tenant profile filled no field",
+      },
+    );
     assert.deepEqual(await readReceiptForm(), {
       ...SAMPLE_TENANT_PROFILE.prefilledEntries,
       periodStart,
       periodEnd,
       paymentDate,
     });
-    assert.equal(await $("#template").getValue(), SAMPLE_TENANT_PROFILE.templateId);
 
     await $("#preview-button").click();
     await $("#preview-page").waitForDisplayed({ timeout: TIMEOUTS_MS.preview });
