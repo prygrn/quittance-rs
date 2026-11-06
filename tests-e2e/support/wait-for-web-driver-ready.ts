@@ -22,37 +22,51 @@ export interface WaitForWebDriverReadyOptions {
   readonly clock: WebDriverReadyClock;
 }
 
-async function describeStatusFailure(
-  options: WaitForWebDriverReadyOptions,
-): Promise<string | null> {
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) {
+    return String(err);
+  }
+  return err.cause === undefined ? err.message : `${err.message} (${String(err.cause)})`;
+}
+
+async function describeStatusFailure(attempt: {
+  readonly options: WaitForWebDriverReadyOptions;
+  readonly signal: AbortSignal;
+}): Promise<string | null> {
   try {
-    const response = await options.fetch({
-      url: options.statusUrl,
-      signal: new AbortController().signal,
+    const response = await attempt.options.fetch({
+      url: attempt.options.statusUrl,
+      signal: attempt.signal,
     });
     return response.ok ? null : `HTTP ${response.status}`;
   } catch (err: unknown) {
-    return err instanceof Error ? `${err.message} (${String(err.cause)})` : String(err);
+    return describeError(err);
   }
 }
 
 async function pollStatus(poll: {
   readonly options: WaitForWebDriverReadyOptions;
   readonly deadlineMs: number;
+  readonly lastFailure: string;
 }): Promise<void> {
   const { options, deadlineMs } = poll;
-  const failure = await describeStatusFailure(options);
-  if (failure === null) {
-    return;
-  }
   const remainingMs = deadlineMs - options.clock.now();
   if (remainingMs <= 0) {
     throw new Error(
-      `[E2E_WEBDRIVER_NOT_READY] ${options.statusUrl} did not answer within ${options.timeoutMs} ms, last failure: ${failure}`,
+      `[E2E_WEBDRIVER_NOT_READY] ${options.statusUrl} did not answer within ${options.timeoutMs} ms, last failure: ${poll.lastFailure}`,
     );
   }
-  await options.clock.sleep(Math.min(options.pollIntervalMs, remainingMs));
-  return pollStatus(poll);
+  // Une connexion acceptée sans réponse ne doit pas prolonger l'attente au-delà du délai.
+  const failure = await describeStatusFailure({
+    options,
+    signal: options.clock.timeoutSignal(remainingMs),
+  });
+  if (failure === null) {
+    return;
+  }
+  const waitMs = Math.min(options.pollIntervalMs, deadlineMs - options.clock.now());
+  await options.clock.sleep(Math.max(0, waitMs));
+  return pollStatus({ options, deadlineMs, lastFailure: failure });
 }
 
 /**
@@ -60,5 +74,9 @@ async function pollStatus(poll: {
  * maximum.
  */
 export async function waitForWebDriverReady(options: WaitForWebDriverReadyOptions): Promise<void> {
-  return pollStatus({ options, deadlineMs: options.clock.now() + options.timeoutMs });
+  return pollStatus({
+    options,
+    deadlineMs: options.clock.now() + options.timeoutMs,
+    lastFailure: "none, the timeout leaves no time for an attempt",
+  });
 }
