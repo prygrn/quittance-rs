@@ -19,6 +19,7 @@ use crate::config_source::ConfigSource;
 use crate::delivery_factory::DeliveryFactory;
 use crate::receipt_input_payload::ReceiptInputPayload;
 use crate::sent_pdf_archive::SentPdfArchive;
+use crate::tenant_profile_payload::TenantProfilePayload;
 
 pub(crate) const STANDARD_TEMPLATE_ID: &str = "standard";
 pub(crate) const CHROME_PATH: &str = "/opt/chromium/chrome";
@@ -215,5 +216,17 @@ impl SentPdfArchive for FakePdfArchive {
             pdf: pdf.to_vec(),
         });
         Ok(())
+    }
+}
+
+pub(crate) fn sample_tenant_profile_payload() -> TenantProfilePayload {
+    TenantProfilePayload {
+        template_id: STANDARD_TEMPLATE_ID.to_owned(),
+        tenant_name: "Jeanne Martin".to_owned(),
+        tenant_address: "8 rue Victor Hugo, 75011 Paris".to_owned(),
+        tenant_email: "jeanne.martin@example.fr".to_owned(),
+        property_address: "12 rue des Lilas, 75011 Paris".to_owned(),
+        rent_cents: 65_000,
+        charges_cents: 5_050,
     }
 }

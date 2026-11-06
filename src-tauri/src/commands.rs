@@ -1,14 +1,20 @@
 //! Commandes Tauri appelées par l'UI : fines enveloppes qui assemblent les implémentations
-//! réelles des effets de bord et délèguent à [`ReceiptService`].
+//! réelles des effets de bord et délèguent à [`ReceiptService`] ou [`TenantProfileService`].
+
+use quittance_tenant_profile::DirectoryTenantProfileStorage;
 
 use crate::blocking_dispatch::run_blocking;
-use crate::command_error::CommandError;
+use crate::command_error::{CommandError, CommandErrorCode};
 use crate::config_source::EnvFileConfigSource;
 use crate::delivery_factory::ChromiumSmtpDelivery;
 use crate::receipt_input_payload::ReceiptInputPayload;
 use crate::receipt_service::ReceiptService;
 use crate::sent_pdf_archive::sent_pdf_archive_for_build;
 use crate::template_info_payload::TemplateInfoPayload;
+use crate::tenant_profile_directory::tenant_profile_directory;
+use crate::tenant_profile_entry_payload::TenantProfileEntryPayload;
+use crate::tenant_profile_payload::TenantProfilePayload;
+use crate::tenant_profile_service::TenantProfileService;
 
 /// Modèles de quittance, dans l'ordre d'affichage.
 #[tauri::command]
@@ -50,6 +56,52 @@ pub async fn send_receipt(
     )
 }
 
+/// Fiches locataire du dossier `fiches/` de l'exécutable, triées par libellé.
+#[tauri::command]
+pub async fn list_tenant_profiles() -> Result<Vec<TenantProfileEntryPayload>, CommandError> {
+    logged(run_blocking(|| with_tenant_profile_service(|service| service.list())).await)
+}
+
+#[tauri::command]
+pub async fn load_tenant_profile(id: String) -> Result<TenantProfilePayload, CommandError> {
+    logged(run_blocking(move || with_tenant_profile_service(|service| service.load(&id))).await)
+}
+
+/// Enregistre une nouvelle fiche ; échoue avec `tenantProfileExists` si elle existe déjà.
+#[tauri::command]
+pub async fn create_tenant_profile(
+    profile: TenantProfilePayload,
+) -> Result<TenantProfileEntryPayload, CommandError> {
+    logged(
+        run_blocking(move || with_tenant_profile_service(|service| service.create(profile))).await,
+    )
+}
+
+/// Enregistre la fiche en écrasant celle de même id, après confirmation dans l'UI.
+#[tauri::command]
+pub async fn replace_tenant_profile(
+    profile: TenantProfilePayload,
+) -> Result<TenantProfileEntryPayload, CommandError> {
+    logged(
+        run_blocking(move || with_tenant_profile_service(|service| service.replace(profile))).await,
+    )
+}
+
+/// Service branché sur le dossier `fiches/` de l'exécutable.
+fn with_tenant_profile_service<T>(
+    action: impl FnOnce(&TenantProfileService<'_>) -> Result<T, CommandError>,
+) -> Result<T, CommandError> {
+    let directory = tenant_profile_directory().map_err(|error| {
+        CommandError::new(
+            CommandErrorCode::TenantProfile,
+            format!("tenant profile directory cannot be located: {error}"),
+        )
+    })?;
+    action(&TenantProfileService {
+        storage: &DirectoryTenantProfileStorage::new(directory),
+    })
+}
+
 /// Service branché sur le fichier `.env` de l'exécutable, Chromium et SMTP.
 fn with_system_service<T>(
     action: impl FnOnce(&ReceiptService<'_>) -> Result<T, CommandError>,
@@ -81,7 +133,6 @@ mod tests {
     use std::fs;
 
     use super::*;
-    use crate::command_error::CommandErrorCode;
     use crate::config_source::ConfigSource;
     use crate::test_support::unique_temp_path;
 

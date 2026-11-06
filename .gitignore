@@ -32,6 +32,9 @@ dist/
 # Tauri
 src-tauri/gen/
 
+# Fiches locataire : données personnelles, jamais commitées
+fiches/
+
 # PDF des mails envoyés en build debug, pour inspection
 tmp/
 
