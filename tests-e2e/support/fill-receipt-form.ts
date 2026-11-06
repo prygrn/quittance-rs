@@ -1,3 +1,5 @@
+import { RECEIPT_FORM_FIELD_IDS } from "./receipt-form-field-ids";
+
 /** Saisie du formulaire telle qu'un utilisateur la tape : dates en jj/mm/aaaa, montants en euros. */
 export interface ReceiptFormEntries {
   readonly tenantName: string;
@@ -11,25 +13,13 @@ export interface ReceiptFormEntries {
   readonly paymentDate: string;
 }
 
-// Identifiants des champs dans index.html.
-const FIELD_IDS: Readonly<Record<keyof ReceiptFormEntries, string>> = {
-  tenantName: "tenant-name",
-  tenantAddress: "tenant-address",
-  tenantEmail: "tenant-email",
-  propertyAddress: "property-address",
-  periodStart: "period-start",
-  periodEnd: "period-end",
-  rentAmount: "rent-amount",
-  chargesAmount: "charges-amount",
-  paymentDate: "payment-date",
-};
-
-/** Tape chaque valeur dans son champ, dans l'ordre du formulaire. */
-export async function fillReceiptForm(entries: ReceiptFormEntries): Promise<void> {
-  const fields = Object.keys(FIELD_IDS) as (keyof ReceiptFormEntries)[];
-  await fields.reduce(
-    (previous: Promise<void>, field) =>
-      previous.then(() => $(`#${FIELD_IDS[field]}`).setValue(entries[field])),
-    Promise.resolve(),
-  );
+/** Tape chaque valeur fournie dans son champ, dans l'ordre du formulaire, sans toucher aux autres. */
+export async function fillReceiptForm(entries: Partial<ReceiptFormEntries>): Promise<void> {
+  const fields = Object.keys(RECEIPT_FORM_FIELD_IDS) as (keyof ReceiptFormEntries)[];
+  await fields.reduce((previous: Promise<void>, field) => {
+    const value = entries[field];
+    return value === undefined
+      ? previous
+      : previous.then(() => $(`#${RECEIPT_FORM_FIELD_IDS[field]}`).setValue(value));
+  }, Promise.resolve());
 }
