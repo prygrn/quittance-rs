@@ -1,0 +1,34 @@
+name: Dépendances système
+description: Lance make system-deps en gardant en cache les paquets .deb téléchargés par apt.
+
+runs:
+  using: composite
+  steps:
+    - id: apt-archives
+      shell: bash
+      env:
+        ARCHIVES_DIR: ${{ runner.temp }}/apt-archives
+        JOB_ID: ${{ github.job }}
+      run: |
+        # /var/cache/apt/archives appartient à root : actions/cache, lancé sans sudo, ne
+        # pourrait pas y restaurer les paquets. apt télécharge donc dans un dossier du runner.
+        mkdir -p "$ARCHIVES_DIR"
+        echo "Dir::Cache::Archives \"$ARCHIVES_DIR\";" | sudo tee /etc/apt/apt.conf.d/zz-ci-apt-archives
+        # La clé change avec les paquets listés par le Makefile et avec le job, qui n'installe
+        # pas les mêmes paquets (make e2e-deps dépose aussi les siens ici).
+        packages_hash=$(grep 'apt-get install' Makefile | sha256sum | cut -d ' ' -f 1)
+        echo "key-prefix=apt-${ImageOS:?ImageOS is not set}-$JOB_ID-$packages_hash-" >> "$GITHUB_OUTPUT"
+        echo "image-version=${ImageVersion:?ImageVersion is not set}" >> "$GITHUB_OUTPUT"
+    # Une nouvelle image du runner crée une nouvelle entrée : le cache précédent sert de base et
+    # apt ne télécharge que les paquets mis à jour depuis.
+    - uses: actions/cache@v6
+      with:
+        # partial/ appartient à _apt, en mode 0700 : seuls les .deb sont lisibles sans sudo.
+        path: ${{ runner.temp }}/apt-archives/*.deb
+        key: ${{ steps.apt-archives.outputs.key-prefix }}${{ steps.apt-archives.outputs.image-version }}
+        restore-keys: ${{ steps.apt-archives.outputs.key-prefix }}
+    - shell: bash
+      run: make system-deps
+    # Retire les versions qui ne sont plus téléchargeables, pour que le cache ne grossisse pas.
+    - shell: bash
+      run: sudo apt-get autoclean
