@@ -8,6 +8,8 @@ export const TIMEOUTS_MS = {
   driverStatusPollInterval: 100,
   /** Chargement de la liste des modèles au démarrage de l'app. */
   templates: 15_000,
+  /** Enregistrement, liste ou chargement d'une fiche locataire par le backend. */
+  tenantProfile: 5_000,
   /** Affichage d'une erreur de saisie après un clic. */
   fieldError: 5_000,
   /** Rendu de l'aperçu par le backend. */

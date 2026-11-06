@@ -6,6 +6,7 @@ import { openReceiptScreen } from "../support/open-receipt-screen";
 import { SAMPLE_RECEIPT } from "../support/sample-receipt";
 import { TEST_LANDLORD } from "../support/test-landlord";
 import { TIMEOUTS_MS } from "../support/timeouts-ms";
+import { waitForSingleMessage } from "../support/wait-for-single-message";
 
 const PDF_SIGNATURE = "%PDF-";
 
@@ -46,15 +47,7 @@ describe("sending a receipt", () => {
     await sendButton.click();
     await $("#send-success").waitForDisplayed({ timeout: TIMEOUTS_MS.send });
 
-    await browser.waitUntil(async () => (await MAILPIT_CLIENT.listMessageIds()).length > 0, {
-      timeout: TIMEOUTS_MS.delivery,
-      timeoutMsg: "[E2E_MAIL_NOT_RECEIVED] Mailpit received no message after the send",
-    });
-    const messageIds = await MAILPIT_CLIENT.listMessageIds();
-    assert.equal(messageIds.length, 1, "exactly one email should be sent");
-    const [messageId] = messageIds;
-    assert.ok(messageId !== undefined);
-    const message = await MAILPIT_CLIENT.getMessage(messageId);
+    const message = await waitForSingleMessage();
     assert.deepEqual(message.toAddresses, [entries.tenantEmail]);
     assert.deepEqual(message.bccAddresses, [TEST_LANDLORD.email]);
     assert.equal(message.fromAddress, TEST_LANDLORD.email);
@@ -70,7 +63,7 @@ describe("sending a receipt", () => {
     assert.equal(attachment.contentType, "application/pdf");
     assert.ok(attachment.size > 0, "the PDF attachment should not be empty");
     const pdf = await MAILPIT_CLIENT.getAttachmentContent({
-      messageId,
+      messageId: message.id,
       partId: attachment.partId,
     });
     assert.equal(
