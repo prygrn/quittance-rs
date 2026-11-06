@@ -9,9 +9,10 @@ import {
 } from "./support/wait-for-web-driver-ready";
 
 // Binaire produit par `tauri build --no-bundle` (cible `make test-e2e`), front embarqué.
-const APPLICATION_PATH = fileURLToPath(new URL("../target/release/quittance-app", import.meta.url));
-const TAURI_DRIVER_PORT = 4444;
-const TAURI_DRIVER_STATUS_POLL_INTERVAL_MS = 100;
+const APPLICATION_PATH: string = fileURLToPath(
+  new URL("../target/release/quittance-app", import.meta.url),
+);
+const TAURI_DRIVER_PORT: number = 4444;
 
 let tauriDriver: ChildProcess | null = null;
 let isTauriDriverStopping = false;
@@ -50,7 +51,7 @@ function spawnTauriDriver(): void {
 
 /**
  * Lance tauri-driver et attend qu'il réponde : il relaie `/status` à WebKitWebDriver, qui
- * démarre après lui. WebdriverIO journalise l'erreur d'un hook sans arrêter la session,
+ * peut être prêt après lui. WebdriverIO journalise l'erreur d'un hook sans arrêter la session,
  * d'où la sortie explicite en cas d'échec.
  */
 async function startTauriDriver(): Promise<void> {
@@ -59,7 +60,7 @@ async function startTauriDriver(): Promise<void> {
     await waitForWebDriverReady({
       statusUrl: `http://127.0.0.1:${TAURI_DRIVER_PORT}/status`,
       timeoutMs: TIMEOUTS_MS.driverStartup,
-      pollIntervalMs: TAURI_DRIVER_STATUS_POLL_INTERVAL_MS,
+      pollIntervalMs: TIMEOUTS_MS.driverStatusPollInterval,
       fetch: (request: WebDriverStatusRequest): Promise<Response> =>
         fetch(request.url, { signal: request.signal }),
       clock: {
