@@ -2,6 +2,8 @@
 export const TIMEOUTS_MS = {
   /** Un scénario complet, de l'ouverture de l'app à la relecture de Mailpit. */
   scenario: 120_000,
+  /** Démarrage de tauri-driver et de WebKitWebDriver, avant l'ouverture de la session. */
+  driverStartup: 10_000,
   /** Chargement de la liste des modèles au démarrage de l'app. */
   templates: 15_000,
   /** Affichage d'une erreur de saisie après un clic. */

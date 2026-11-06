@@ -14,10 +14,40 @@ export interface WaitForWebDriverReadyOptions {
   readonly clock: WebDriverReadyClock;
 }
 
+async function describeStatusFailure(
+  options: WaitForWebDriverReadyOptions,
+): Promise<string | null> {
+  try {
+    const response = await options.fetch(options.statusUrl);
+    return response.ok ? null : `HTTP ${response.status}`;
+  } catch (err: unknown) {
+    return err instanceof Error ? `${err.message} (${String(err.cause)})` : String(err);
+  }
+}
+
+async function pollStatus(poll: {
+  readonly options: WaitForWebDriverReadyOptions;
+  readonly deadlineMs: number;
+}): Promise<void> {
+  const { options, deadlineMs } = poll;
+  const failure = await describeStatusFailure(options);
+  if (failure === null) {
+    return;
+  }
+  const remainingMs = deadlineMs - options.clock.now();
+  if (remainingMs <= 0) {
+    throw new Error(
+      `[E2E_WEBDRIVER_NOT_READY] ${options.statusUrl} did not answer within ${options.timeoutMs} ms, last failure: ${failure}`,
+    );
+  }
+  await options.clock.sleep(Math.min(options.pollIntervalMs, remainingMs));
+  return pollStatus(poll);
+}
+
 /**
  * Attend qu'un serveur WebDriver réponde à `GET /status`, en réessayant jusqu'au délai
  * maximum.
  */
 export async function waitForWebDriverReady(options: WaitForWebDriverReadyOptions): Promise<void> {
-  throw new Error(`[E2E_NOT_IMPLEMENTED] waitForWebDriverReady(${options.statusUrl})`);
+  return pollStatus({ options, deadlineMs: options.clock.now() + options.timeoutMs });
 }
