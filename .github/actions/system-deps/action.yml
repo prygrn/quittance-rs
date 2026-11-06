@@ -17,16 +17,21 @@ runs:
         # La clé change avec les paquets listés par le Makefile et avec le job, qui n'installe
         # pas les mêmes paquets (make e2e-deps dépose aussi les siens ici).
         packages_hash=$(grep 'apt-get install' Makefile | sha256sum | cut -d ' ' -f 1)
-        echo "key-prefix=apt-${ImageOS:?ImageOS is not set}-$JOB_ID-$packages_hash-" >> "$GITHUB_OUTPUT"
+        packages_prefix="apt-${ImageOS:?ImageOS is not set}-$packages_hash-"
+        echo "packages-prefix=$packages_prefix" >> "$GITHUB_OUTPUT"
+        echo "job-prefix=$packages_prefix$JOB_ID-" >> "$GITHUB_OUTPUT"
         echo "image-version=${ImageVersion:?ImageVersion is not set}" >> "$GITHUB_OUTPUT"
-    # Une nouvelle image du runner crée une nouvelle entrée : le cache précédent sert de base et
-    # apt ne télécharge que les paquets mis à jour depuis.
+    # Une nouvelle image du runner crée une nouvelle entrée : le cache précédent du job sert de
+    # base et apt ne télécharge que les paquets mis à jour depuis. Un job sans cache repart de
+    # celui d'un autre job, qui contient déjà les paquets de make system-deps.
     - uses: actions/cache@v6
       with:
         # partial/ appartient à _apt, en mode 0700 : seuls les .deb sont lisibles sans sudo.
         path: ${{ runner.temp }}/apt-archives/*.deb
-        key: ${{ steps.apt-archives.outputs.key-prefix }}${{ steps.apt-archives.outputs.image-version }}
-        restore-keys: ${{ steps.apt-archives.outputs.key-prefix }}
+        key: ${{ steps.apt-archives.outputs.job-prefix }}${{ steps.apt-archives.outputs.image-version }}
+        restore-keys: |
+          ${{ steps.apt-archives.outputs.job-prefix }}
+          ${{ steps.apt-archives.outputs.packages-prefix }}
     - shell: bash
       run: make system-deps
     # Retire les versions qui ne sont plus téléchargeables, pour que le cache ne grossisse pas.
