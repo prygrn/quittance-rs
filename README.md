@@ -14,6 +14,7 @@ Générateur de quittances de loyer, pour usage personnel (bailleur particulier)
 - Preview du document avant envoi
 - Signature manuscrite protégée contre la copie (voir ci-dessous)
 - Envoi automatique au locataire par email (SMTP)
+- Fiches locataire qui préremplissent les quittances suivantes (voir [Fiches locataire](#fiches-locataire))
 
 L'outil ne produit que des quittances, c'est-à-dire des attestations de paiement intégral du loyer et des charges d'une période. Un paiement partiel appelle un simple reçu, hors du périmètre de quittance-rs.
 
@@ -129,7 +130,7 @@ La CSP de `src-tauri/tauri.conf.json` n'autorise que les scripts et styles de l'
 
 ### Tests e2e
 
-`make test-e2e` construit l'app en release (`tauri build --no-bundle`, front embarqué), puis pilote son interface sous `xvfb-run` avec WebdriverIO et tauri-driver (`tests-e2e/`). L'app y reçoit sa configuration par l'environnement : bailleur de test, signature `src-tauri/fixtures/signature.png`, envoi en clair vers Mailpit. Il faut donc :
+`make test-e2e` construit l'app en release (`tauri build --no-bundle`, front embarqué), puis pilote son interface sous `xvfb-run` avec WebdriverIO et tauri-driver (`tests-e2e/`). Avant d'ouvrir chaque session, `beforeSession` lance tauri-driver et attend qu'il soit prêt à accepter les connexions. L'app y reçoit sa configuration par l'environnement : bailleur de test, signature `src-tauri/fixtures/signature.png`, envoi en clair vers Mailpit. Il faut donc :
 
 - les outils de `make e2e-deps` ;
 - `CHROME_PATH`, chemin de Chromium ou Chrome ;
@@ -152,9 +153,25 @@ Pour chaque feature : API publique en stubs et suite complète de tests unitaire
 
 GitHub Actions, en deux étages :
 
-1. `quality` puis `unit` : format, lint, build debug, tests unitaires ;
+1. `quality`, puis `unit` et `msrv` : format, lint, build debug, tests unitaires ; `msrv` compile le workspace avec le `rust-version` du `Cargo.toml` (`make msrv-check`) ;
 2. `release-integration` : build release, tests d'intégration, tests e2e.
+
+Les paquets `.deb` téléchargés par `make system-deps` et `make e2e-deps` sont mis en cache entre deux exécutions de la CI ; apt les réinstalle à chaque fois, sans les retélécharger.
+
+### Publier une version
+
+1. Créer la branche `release/X.Y.Z` depuis `master`.
+2. Ouvrir sur cette branche la PR de corrections et la PR de doc. La PR de doc porte la version (`src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `Cargo.lock`) et la section `X.Y.Z` du `CHANGELOG.md`.
+3. Ouvrir la PR `release/X.Y.Z` → `master`, mergée par le mainteneur.
+4. Une fois la CI verte sur `master`, poser et pousser le tag :
+
+```bash
+git tag -a vX.Y.Z -m "quittance-rs vX.Y.Z"
+git push quittance-rs vX.Y.Z
+```
+
+Le hook `pre-push` ne bloque que les branches `main` et `master` : il laisse passer le push d'un tag.
 
 ## Statut
 
-Socle en place (workspace, outillage, hooks, CI). Features en cours d'implémentation.
+Version 1.1.0 : saisie, aperçu et envoi des quittances, signature protégée contre la copie, fiches locataire. Le détail des versions est dans le [CHANGELOG](CHANGELOG.md).

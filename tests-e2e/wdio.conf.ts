@@ -3,10 +3,16 @@ import { fileURLToPath } from "node:url";
 
 import { appEnvironment } from "./support/app-environment";
 import { TIMEOUTS_MS } from "./support/timeouts-ms";
+import {
+  type WebDriverStatusRequest,
+  waitForWebDriverReady,
+} from "./support/wait-for-web-driver-ready";
 
 // Binaire produit par `tauri build --no-bundle` (cible `make test-e2e`), front embarqué.
-const APPLICATION_PATH = fileURLToPath(new URL("../target/release/quittance-app", import.meta.url));
-const TAURI_DRIVER_PORT = 4444;
+const APPLICATION_PATH: string = fileURLToPath(
+  new URL("../target/release/quittance-app", import.meta.url),
+);
+const TAURI_DRIVER_PORT: number = 4444;
 
 let tauriDriver: ChildProcess | null = null;
 let isTauriDriverStopping = false;
@@ -21,7 +27,7 @@ function stopTauriDriver(): void {
  * Lance tauri-driver, qui démarre l'app pour chaque session WebDriver. L'app hérite de
  * son environnement, d'où la configuration de test injectée ici.
  */
-function startTauriDriver(): void {
+function spawnTauriDriver(): void {
   isTauriDriverStopping = false;
   const driver = spawn("tauri-driver", ["--port", String(TAURI_DRIVER_PORT)], {
     env: { ...process.env, ...appEnvironment() },
@@ -41,6 +47,33 @@ function startTauriDriver(): void {
     }
   });
   tauriDriver = driver;
+}
+
+/**
+ * Lance tauri-driver et attend qu'il réponde : il relaie `/status` à WebKitWebDriver, qui
+ * peut être prêt après lui. WebdriverIO journalise l'erreur d'un hook sans arrêter la session,
+ * d'où la sortie explicite en cas d'échec.
+ */
+async function startTauriDriver(): Promise<void> {
+  spawnTauriDriver();
+  try {
+    await waitForWebDriverReady({
+      statusUrl: `http://127.0.0.1:${TAURI_DRIVER_PORT}/status`,
+      timeoutMs: TIMEOUTS_MS.driverStartup,
+      pollIntervalMs: TIMEOUTS_MS.driverStatusPollInterval,
+      fetch: (request: WebDriverStatusRequest): Promise<Response> =>
+        fetch(request.url, { signal: request.signal }),
+      clock: {
+        now: (): number => Date.now(),
+        sleep: (durationMs: number): Promise<void> =>
+          new Promise((resolve) => setTimeout(resolve, durationMs)),
+        timeoutSignal: (durationMs: number): AbortSignal => AbortSignal.timeout(durationMs),
+      },
+    });
+  } catch (err: unknown) {
+    console.error("[E2E_TAURI_DRIVER_NOT_READY] tauri-driver did not become ready", err);
+    process.exit(1);
+  }
 }
 
 process.on("exit", stopTauriDriver);
