@@ -156,13 +156,13 @@ GitHub Actions, en deux étages :
 1. `quality`, puis `unit` et `msrv` : format, lint, build debug, tests unitaires ; `msrv` compile le workspace avec le `rust-version` du `Cargo.toml` (`make msrv-check`) ;
 2. `release-integration` : build release, tests d'intégration, tests e2e.
 
-Les paquets apt installés par `make system-deps` sont mis en cache entre deux exécutions.
+Les paquets `.deb` téléchargés par `make system-deps` et `make e2e-deps` sont mis en cache entre deux exécutions de la CI ; apt les réinstalle à chaque fois, sans les retélécharger.
 
 ### Publier une version
 
 1. Créer la branche `release/X.Y.Z` depuis `master`.
 2. Ouvrir sur cette branche la PR de corrections et la PR de doc. La PR de doc porte la version (`src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `Cargo.lock`) et la section `X.Y.Z` du `CHANGELOG.md`.
-3. Ouvrir la PR `release/X.Y.Z` → `master`, mergée par l'humain.
+3. Ouvrir la PR `release/X.Y.Z` → `master`, mergée par le mainteneur.
 4. Une fois la CI verte sur `master`, poser et pousser le tag :
 
 ```bash
