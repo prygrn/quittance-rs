@@ -619,3 +619,35 @@ select:disabled {
   transform: scale(0.75);
   transform-origin: top left;
 }
+
+/* Fiche locataire */
+
+.tenant-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tenant-profile-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.tenant-profile-picker .button {
+  height: auto;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.button-small {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}

@@ -41,6 +41,42 @@ export function findReceiptScreenElements(root: ParentNode): ReceiptScreenElemen
     form: find({ selector: "#receipt-form", type: HTMLFormElement }),
     formControls: find({ selector: "#form-controls", type: HTMLFieldSetElement }),
     templateSelect: find({ selector: "#template", type: HTMLSelectElement }),
+    tenantProfileSelect: find({ selector: "#tenant-profile", type: HTMLSelectElement }),
+    tenantProfileEmptyOption: find({
+      selector: '#tenant-profile option[value=""]',
+      type: HTMLOptionElement,
+    }),
+    saveTenantProfileButton: find({
+      selector: "#save-tenant-profile-button",
+      type: HTMLButtonElement,
+    }),
+    tenantProfileReplacement: find({ selector: "#tenant-profile-replace", type: HTMLElement }),
+    tenantProfileReplacementName: find({
+      selector: "#tenant-profile-replace .banner-name",
+      type: HTMLElement,
+    }),
+    replaceTenantProfileButton: find({
+      selector: "#replace-tenant-profile-button",
+      type: HTMLButtonElement,
+    }),
+    cancelReplaceTenantProfileButton: find({
+      selector: "#cancel-replace-tenant-profile-button",
+      type: HTMLButtonElement,
+    }),
+    tenantProfileSaved: find({ selector: "#tenant-profile-saved", type: HTMLElement }),
+    tenantProfileSavedLabel: find({
+      selector: "#tenant-profile-saved .banner-label",
+      type: HTMLElement,
+    }),
+    tenantProfileFailure: find({ selector: "#tenant-profile-failure", type: HTMLElement }),
+    tenantProfileFailureTitle: find({
+      selector: "#tenant-profile-failure .banner-title",
+      type: HTMLElement,
+    }),
+    tenantProfileFailureText: find({
+      selector: "#tenant-profile-failure .banner-text",
+      type: HTMLElement,
+    }),
     fieldInputs: mapFields((field) => requireTextField({ root, id: RECEIPT_FIELD_IDS[field] })),
     fieldErrorMessages: byField({
       selectorOf: (id) => `#${id}${FIELD_ERROR_ID_SUFFIX}`,

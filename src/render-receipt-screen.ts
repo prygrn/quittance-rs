@@ -9,7 +9,9 @@ import { formatEuroCents } from "./format-euro-cents";
 import type { ReceiptFormField, ReceiptFormValues } from "./receipt-form";
 import type { ReceiptScreenElements } from "./receipt-screen-elements";
 import type { ReceiptScreenModel } from "./receipt-screen-model";
+import { renderTenantProfileControls } from "./render-tenant-profile-controls";
 import type { ScreenState } from "./screen-state";
+import { setText } from "./set-text";
 
 type StatusTone = "neutral" | "busy" | "success" | "error";
 
@@ -38,6 +40,10 @@ const SCREEN_TEXTS = {
     count === 1
       ? "1 champ est à corriger avant l'aperçu."
       : `${count} champs sont à corriger avant l'aperçu.`,
+  tenantProfileErrorSummary: (count: number): string =>
+    count === 1
+      ? "1 champ est à corriger avant d'enregistrer la fiche."
+      : `${count} champs sont à corriger avant d'enregistrer la fiche.`,
 } as const;
 
 const PREVIEW_STATUSES = {
@@ -71,6 +77,7 @@ export function renderReceiptScreen(options: {
   elements.formControls.disabled = isSending;
   elements.form.setAttribute("aria-busy", String(isSending));
   renderFieldErrors({ elements, model });
+  renderTenantProfileControls({ elements, model });
   setText({ element: elements.total, text: totalOf(formValues) });
   setText({ element: elements.announcement, text: announcementOf(model) });
 
@@ -78,7 +85,7 @@ export function renderReceiptScreen(options: {
   elements.errorSummary.hidden = errorCount === 0;
   setText({
     element: elements.errorSummaryText,
-    text: errorCount === 0 ? "" : SCREEN_TEXTS.errorSummary(errorCount),
+    text: errorSummaryOf({ count: errorCount, model }),
   });
   elements.staleBanner.hidden = !(isIdleWithoutErrors && model.isPreviewStale);
   elements.sendSuccess.hidden = screenState.status !== "sent";
@@ -182,6 +189,18 @@ function paneFailureCodeOf(model: ReceiptScreenModel): CommandErrorCode | null {
   return screenState.status === "idle" ? model.templateLoadError : null;
 }
 
+function errorSummaryOf(summary: {
+  readonly count: number;
+  readonly model: ReceiptScreenModel;
+}): string {
+  if (summary.count === 0) {
+    return "";
+  }
+  return summary.model.validatedAction === "saveTenantProfile"
+    ? SCREEN_TEXTS.tenantProfileErrorSummary(summary.count)
+    : SCREEN_TEXTS.errorSummary(summary.count);
+}
+
 function totalOf(values: ReceiptFormValues): string {
   const rent = parseAmountCents(values.rentAmount);
   const charges = parseAmountCents(values.chargesAmount);
@@ -241,11 +260,4 @@ function failureText(code: CommandErrorCode | null): string {
 
 function failureAnnouncement(code: CommandErrorCode): string {
   return `${failureTitle(code)}. ${failureText(code)}`;
-}
-
-// Réécrire un texte identique ferait répéter les régions `aria-live` par certains lecteurs d'écran.
-function setText(options: { readonly element: HTMLElement; readonly text: string }): void {
-  if (options.element.textContent !== options.text) {
-    options.element.textContent = options.text;
-  }
 }

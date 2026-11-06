@@ -1,7 +1,7 @@
-import { type AmountErrorCode, parseAmountCents } from "./amount";
+import type { AmountErrorCode } from "./amount";
 import type { ReceiptInput } from "./api";
-import { isWellFormedEmail } from "./email";
 import { isValidIsoDate } from "./iso-date";
+import { validateTenantProfileForm } from "./tenant-profile-form";
 
 /** Valeurs brutes du formulaire, telles que lues dans les champs HTML. */
 export interface ReceiptFormValues {
@@ -28,82 +28,37 @@ export type ReceiptFormResult =
   { isValid: true; input: ReceiptInput } | { isValid: false; errors: ReceiptFormErrors };
 
 type DateField = "periodStart" | "periodEnd" | "paymentDate";
-type AmountField = "rentAmount" | "chargesAmount";
 
 const DATE_FIELDS: readonly DateField[] = ["periodStart", "periodEnd", "paymentDate"];
-const AMOUNT_FIELDS: readonly AmountField[] = ["rentAmount", "chargesAmount"];
 
-/** Nettoie et valide la saisie ; renvoie soit un `ReceiptInput`, soit une erreur par champ. */
+/**
+ * Nettoie et valide la saisie ; renvoie soit un `ReceiptInput`, soit une erreur par champ.
+ * Les champs d'une fiche locataire sont validés par `validateTenantProfileForm`.
+ */
 export function validateReceiptForm(values: ReceiptFormValues): ReceiptFormResult {
-  const trimmed = trimmedValues(values);
-  const errors: ReceiptFormErrors = {};
+  const tenantProfile = validateTenantProfileForm(values);
+  const errors: ReceiptFormErrors = tenantProfile.isValid ? {} : { ...tenantProfile.errors };
+  const dates: Record<DateField, string> = {
+    periodStart: values.periodStart.trim(),
+    periodEnd: values.periodEnd.trim(),
+    paymentDate: values.paymentDate.trim(),
+  };
 
-  // Un champ vide n'a qu'une erreur à afficher : « obligatoire » prime sur le format.
-  for (const field of Object.keys(trimmed) as ReceiptFormField[]) {
-    if (trimmed[field] === "") {
-      errors[field] = "missing";
-    }
-  }
-  if (errors.tenantEmail === undefined && !isWellFormedEmail(trimmed.tenantEmail)) {
-    errors.tenantEmail = "invalidEmail";
-  }
   for (const field of DATE_FIELDS) {
-    if (errors[field] === undefined && !isValidIsoDate(trimmed[field])) {
+    if (dates[field] === "") {
+      errors[field] = "missing";
+    } else if (!isValidIsoDate(dates[field])) {
       errors[field] = "invalidDate";
     }
   }
   // Les dates ISO valides se comparent dans l'ordre lexicographique.
   const hasValidPeriodBounds = errors.periodStart === undefined && errors.periodEnd === undefined;
-  if (hasValidPeriodBounds && trimmed.periodStart > trimmed.periodEnd) {
+  if (hasValidPeriodBounds && dates.periodStart > dates.periodEnd) {
     errors.periodEnd = "invertedPeriod";
   }
-  const amountCents: Partial<Record<AmountField, number>> = {};
-  for (const field of AMOUNT_FIELDS) {
-    if (errors[field] !== undefined) {
-      continue;
-    }
-    const amount = parseAmountCents(trimmed[field]);
-    if (amount.isValid) {
-      amountCents[field] = amount.cents;
-    } else {
-      errors[field] = amount.error;
-    }
-  }
 
-  if (
-    Object.keys(errors).length > 0 ||
-    amountCents.rentAmount === undefined ||
-    amountCents.chargesAmount === undefined
-  ) {
+  if (!tenantProfile.isValid || Object.keys(errors).length > 0) {
     return { isValid: false, errors };
   }
-  return {
-    isValid: true,
-    input: {
-      tenantName: trimmed.tenantName,
-      tenantAddress: trimmed.tenantAddress,
-      tenantEmail: trimmed.tenantEmail,
-      propertyAddress: trimmed.propertyAddress,
-      periodStart: trimmed.periodStart,
-      periodEnd: trimmed.periodEnd,
-      rentCents: amountCents.rentAmount,
-      chargesCents: amountCents.chargesAmount,
-      paymentDate: trimmed.paymentDate,
-    },
-  };
-}
-
-function trimmedValues(values: ReceiptFormValues): ReceiptFormValues {
-  // Liste blanche : seuls les champs connus du formulaire sont recopiés.
-  return {
-    tenantName: values.tenantName.trim(),
-    tenantAddress: values.tenantAddress.trim(),
-    tenantEmail: values.tenantEmail.trim(),
-    propertyAddress: values.propertyAddress.trim(),
-    periodStart: values.periodStart.trim(),
-    periodEnd: values.periodEnd.trim(),
-    rentAmount: values.rentAmount.trim(),
-    chargesAmount: values.chargesAmount.trim(),
-    paymentDate: values.paymentDate.trim(),
-  };
+  return { isValid: true, input: { ...tenantProfile.fields, ...dates } };
 }

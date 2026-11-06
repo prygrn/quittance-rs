@@ -17,6 +17,59 @@
           </header>
 
           <fieldset id="form-controls" class="form-controls">
+            <div class="tenant-profile">
+              <div class="field">
+                <label for="tenant-profile">Fiche locataire</label>
+                <div class="tenant-profile-picker">
+                  <select id="tenant-profile" name="tenantProfile">
+                    <option value="">Aucune fiche</option>
+                  </select>
+                  <button
+                    id="save-tenant-profile-button"
+                    class="button button-secondary"
+                    type="button"
+                  >
+                    Enregistrer la fiche
+                  </button>
+                </div>
+              </div>
+              <div id="tenant-profile-replace" class="banner banner-info" role="alert" hidden>
+                <span class="banner-mark" aria-hidden="true">?</span>
+                <div class="banner-body">
+                  <span>
+                    Une fiche existe déjà pour <strong class="banner-name"></strong>. Remplacer ?
+                  </span>
+                  <div class="banner-actions">
+                    <button
+                      id="replace-tenant-profile-button"
+                      class="button button-primary button-small"
+                      type="button"
+                    >
+                      Remplacer
+                    </button>
+                    <button
+                      id="cancel-replace-tenant-profile-button"
+                      class="button button-secondary button-small"
+                      type="button"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div id="tenant-profile-saved" class="banner banner-success" role="status" hidden>
+                <span class="banner-mark" aria-hidden="true">✓</span>
+                <span>Fiche <strong class="banner-label"></strong> enregistrée.</span>
+              </div>
+              <div id="tenant-profile-failure" class="banner banner-error" role="alert" hidden>
+                <span class="banner-mark" aria-hidden="true">!</span>
+                <div class="banner-body">
+                  <strong class="banner-title"></strong>
+                  <span class="banner-text"></span>
+                </div>
+              </div>
+            </div>
+
             <div class="field">
               <label for="template">Modèle de quittance</label>
               <select id="template" name="template" required></select>

@@ -1,6 +1,8 @@
 import type { ReceiptInput, TemplateInfo } from "./api";
+import { invalidCommandResponseError } from "./invalid-command-response-error";
 import type { InvokeCommand } from "./invoke-command";
 import type { ReceiptGateway } from "./receipt-gateway";
+import { readOwnField } from "./read-own-field";
 import type { PreviewRequest } from "./screen-state";
 import { toLocalIsoDate } from "./to-local-iso-date";
 
@@ -32,7 +34,7 @@ export function createTauriReceiptGateway(dependencies: {
     listTemplates: async (): Promise<readonly TemplateInfo[]> => {
       const response = await invokeCommand("list_templates", {});
       if (!isTemplateInfoList(response)) {
-        throw invalidResponseError({
+        throw invalidCommandResponseError({
           command: "list_templates",
           expected: "TemplateInfo[]",
           response,
@@ -43,14 +45,18 @@ export function createTauriReceiptGateway(dependencies: {
     renderPreview: async (request: PreviewRequest): Promise<string> => {
       const response = await invokeCommand("preview_receipt", receiptArguments(request));
       if (typeof response !== "string") {
-        throw invalidResponseError({ command: "preview_receipt", expected: "string", response });
+        throw invalidCommandResponseError({
+          command: "preview_receipt",
+          expected: "string",
+          response,
+        });
       }
       return response;
     },
     sendReceipt: async (request: PreviewRequest): Promise<void> => {
       const response = await invokeCommand("send_receipt", receiptArguments(request));
       if (response !== null) {
-        throw invalidResponseError({ command: "send_receipt", expected: "null", response });
+        throw invalidCommandResponseError({ command: "send_receipt", expected: "null", response });
       }
     },
   };
@@ -61,34 +67,8 @@ function isTemplateInfoList(value: unknown): value is readonly TemplateInfo[] {
 }
 
 function isTemplateInfo(value: unknown): value is TemplateInfo {
-  return hasOwnString({ value, field: "id" }) && hasOwnString({ value, field: "label" });
-}
-
-function hasOwnString(candidate: { readonly value: unknown; readonly field: string }): boolean {
-  const { value, field } = candidate;
   return (
-    typeof value === "object" &&
-    value !== null &&
-    Object.hasOwn(value, field) &&
-    typeof (value as Readonly<Record<string, unknown>>)[field] === "string"
+    typeof readOwnField({ value, field: "id" }) === "string" &&
+    typeof readOwnField({ value, field: "label" }) === "string"
   );
-}
-
-// Sans `code`, l'erreur est traitée comme `unknown` par l'écran, qui la journalise.
-function invalidResponseError(details: {
-  readonly command: string;
-  readonly expected: string;
-  readonly response: unknown;
-}): Error {
-  return new Error(
-    `[UI_INVALID_COMMAND_RESPONSE] command ${details.command} returned ${describeValue(details.response)} instead of ${details.expected}`,
-  );
-}
-
-// Type seul, sans le contenu : une réponse peut être volumineuse ou contenir des données personnelles.
-function describeValue(value: unknown): string {
-  if (value === null) {
-    return "null";
-  }
-  return Array.isArray(value) ? "an array" : `a value of type ${typeof value}`;
 }

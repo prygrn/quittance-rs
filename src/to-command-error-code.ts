@@ -8,6 +8,8 @@ const KNOWN_COMMAND_ERROR_CODES = {
   pdf: true,
   mail: true,
   config: true,
+  tenantProfile: true,
+  tenantProfileExists: true,
   unknown: true,
 } as const satisfies Record<CommandErrorCode, true>;
 

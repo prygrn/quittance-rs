@@ -28,6 +28,14 @@ export const COMMAND_ERROR_MESSAGES: Readonly<
     title: "Le mail n'a pas pu partir",
     text: "Le serveur d'envoi n'a pas répondu ou a refusé le message. Vérifiez votre connexion internet, puis réessayez. Rien n'a été envoyé.",
   },
+  tenantProfile: {
+    title: "La fiche locataire est inutilisable",
+    text: "La fiche n'a pas pu être lue ou enregistrée : son fichier est peut-être absent, endommagé ou impossible à écrire dans le dossier « fiches ».",
+  },
+  tenantProfileExists: {
+    title: "Cette fiche locataire existe déjà",
+    text: "Une fiche porte déjà le nom de ce locataire. Confirmez son remplacement pour l'écraser.",
+  },
   unknown: {
     title: "Une erreur inattendue s'est produite",
     text: "L'opération n'a pas abouti et rien n'a été envoyé. Réessayez ; si le problème persiste, redémarrez l'application.",
