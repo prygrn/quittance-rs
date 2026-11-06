@@ -7,12 +7,14 @@ runs:
     - id: apt-archives
       shell: bash
       env:
-        ARCHIVES_DIR: ${{ runner.temp }}/apt-archives
+        ARCHIVES_DIR: /var/cache/ci-apt-archives
         JOB_ID: ${{ github.job }}
       run: |
         # /var/cache/apt/archives appartient à root : actions/cache, lancé sans sudo, ne
-        # pourrait pas y restaurer les paquets. apt télécharge donc dans un dossier du runner.
-        mkdir -p "$ARCHIVES_DIR"
+        # pourrait pas y restaurer les paquets. apt télécharge donc dans un dossier du runner,
+        # hors de /home/runner où _apt ne peut pas entrer (téléchargement « unsandboxed »).
+        sudo install -d -o "$(id -u)" -g "$(id -g)" "$ARCHIVES_DIR"
+        echo "archives-dir=$ARCHIVES_DIR" >> "$GITHUB_OUTPUT"
         echo "Dir::Cache::Archives \"$ARCHIVES_DIR\";" | sudo tee /etc/apt/apt.conf.d/zz-ci-apt-archives
         # La clé change avec les paquets listés par le Makefile et avec le job, qui n'installe
         # pas les mêmes paquets (make e2e-deps dépose aussi les siens ici).
@@ -27,7 +29,7 @@ runs:
     - uses: actions/cache@v6
       with:
         # partial/ appartient à _apt, en mode 0700 : seuls les .deb sont lisibles sans sudo.
-        path: ${{ runner.temp }}/apt-archives/*.deb
+        path: ${{ steps.apt-archives.outputs.archives-dir }}/*.deb
         key: ${{ steps.apt-archives.outputs.job-prefix }}${{ steps.apt-archives.outputs.image-version }}
         restore-keys: |
           ${{ steps.apt-archives.outputs.job-prefix }}
