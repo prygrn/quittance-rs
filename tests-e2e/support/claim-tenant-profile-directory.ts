@@ -3,7 +3,10 @@ import path from "node:path";
 
 import { RELEASE_BUILD } from "./release-build";
 
-/** Fichier de fiche écrit par un scénario, reconnu à son nom et à l'un de ses contenus possibles. */
+/**
+ * Fichier de fiche écrit par un scénario, reconnu à son nom et à un contenu identique octet
+ * pour octet à l'un de ses contenus possibles.
+ */
 export interface ScenarioTenantProfileFile {
   readonly fileName: string;
   readonly knownContents: readonly string[];
@@ -32,6 +35,20 @@ async function listEntries(directory: string): Promise<readonly string[] | null>
   }
 }
 
+async function readEntry(filePath: string): Promise<string> {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch (err: unknown) {
+    throw new Error(`[E2E_TENANT_PROFILE_UNREADABLE] could not read ${filePath}`, {
+      cause: err,
+    });
+  }
+}
+
+/**
+ * Une entrée vient du scénario quand elle porte le nom de son fichier et que son contenu
+ * est identique, octet pour octet, à l'un de ses contenus possibles.
+ */
 async function isScenarioEntry(options: {
   readonly entry: string;
   readonly file: ScenarioTenantProfileFile;
@@ -39,10 +56,7 @@ async function isScenarioEntry(options: {
   if (options.entry !== options.file.fileName) {
     return false;
   }
-  const contents = await readFile(
-    path.join(RELEASE_BUILD.tenantProfileDirectory, options.entry),
-    "utf8",
-  );
+  const contents = await readEntry(path.join(RELEASE_BUILD.tenantProfileDirectory, options.entry));
   return options.file.knownContents.includes(contents);
 }
 

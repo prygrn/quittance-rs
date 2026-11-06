@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
  * embarqué : l'exécutable lancé par tauri-driver et le dossier `fiches/` qu'il lit à côté
  * de lui.
  */
-export const RELEASE_BUILD = {
+export const RELEASE_BUILD: {
+  readonly applicationPath: string;
+  readonly tenantProfileDirectory: string;
+} = {
   applicationPath: fileURLToPath(new URL("../../target/release/quittance-app", import.meta.url)),
   tenantProfileDirectory: fileURLToPath(new URL("../../target/release/fiches", import.meta.url)),
-} as const;
+};
