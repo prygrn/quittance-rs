@@ -2,7 +2,8 @@ import { TIMEOUTS_MS } from "./timeouts-ms";
 
 /**
  * Attend que l'écran soit utilisable : la liste des modèles, chargée depuis le backend
- * au démarrage, propose au moins un modèle.
+ * au démarrage, propose au moins un modèle. À appeler avant toute autre recherche d'élément :
+ * une recherche lancée pendant le démarrage de l'app bloque WebKitWebDriver.
  */
 export async function openReceiptScreen(): Promise<void> {
   await $("#template option").waitForExist({

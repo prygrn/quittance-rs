@@ -1,17 +1,13 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
 
 import { appEnvironment } from "./support/app-environment";
+import { RELEASE_BUILD } from "./support/release-build";
 import { TIMEOUTS_MS } from "./support/timeouts-ms";
 import {
   type WebDriverStatusRequest,
   waitForWebDriverReady,
 } from "./support/wait-for-web-driver-ready";
 
-// Binaire produit par `tauri build --no-bundle` (cible `make test-e2e`), front embarqué.
-const APPLICATION_PATH: string = fileURLToPath(
-  new URL("../target/release/quittance-app", import.meta.url),
-);
 const TAURI_DRIVER_PORT: number = 4444;
 
 let tauriDriver: ChildProcess | null = null;
@@ -87,7 +83,7 @@ export const config: WebdriverIO.Config = {
   maxInstances: 1,
   capabilities: [
     {
-      "tauri:options": { application: APPLICATION_PATH },
+      "tauri:options": { application: RELEASE_BUILD.applicationPath },
     },
   ],
   // L'affichage virtuel est fourni par xvfb-run (Makefile), pas par WebdriverIO.
